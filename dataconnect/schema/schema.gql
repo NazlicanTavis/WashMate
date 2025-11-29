@@ -1,0 +1,46 @@
+type User @table {
+  displayName: String!
+  email: String!
+  role: String!
+  createdAt: Timestamp!
+  dormitory: Dormitory
+}
+
+type Dormitory @table {
+  name: String!
+  address: String!
+  createdAt: Timestamp!
+  description: String
+  contactEmail: String
+}
+
+type WashingMachine @table {
+  dormitory: Dormitory!
+  machineNumber: Int!
+  status: String!
+  capacity: String!
+  createdAt: Timestamp!
+  lastMaintenanceDate: Timestamp
+  model: String
+}
+
+type Reservation @table {
+  user: User!
+  washingMachine: WashingMachine!
+  startTime: Timestamp!
+  endTime: Timestamp!
+  status: String!
+  createdAt: Timestamp!
+  notes: String
+}
+
+type IssueReport @table {
+  user: User!
+  washingMachine: WashingMachine!
+  issueType: String!
+  description: String!
+  status: String!
+  createdAt: Timestamp!
+  resolvedBy: User
+  resolvedAt: Timestamp
+}

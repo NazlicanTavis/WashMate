@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WashMate</title>
+</head>
+<body>
+  <h1>WashMate</h1>
+
+  <!-- AUTH SECTION -->
+  <div id="authSection">
+    <h2>Login / Register</h2>
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <button id="registerBtn">Register</button>
+    <button id="loginBtn">Login</button>
+  </div>
+
+  <!-- DASHBOARD SECTION -->
+  <div id="dashboardSection" style="display: none;">
+    <h2>Student Dashboard</h2>
+    <p>
+      Welcome, <span id="userEmail"></span>
+      <button id="logoutBtn">Logout</button>
+    </p>
+
+    <h3>Machines</h3>
+    <table border="1">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="machinesTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Uygulama JS -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>

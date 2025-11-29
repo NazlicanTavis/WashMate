@@ -1,0 +1,20 @@
+mutation CreateIssueReport($userId: UUID!, $washingMachineId: UUID!, $description: String!, $issueType: String!) @auth(level: USER) {
+  issueReport_insert(data: {userId: $userId, washingMachineId: $washingMachineId, description: $description, issueType: $issueType, status: "open", createdAt_expr: "request.time"})
+}
+
+query ListAvailableWashingMachines($dormitoryId: UUID!) @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  washingMachines(where: {dormitoryId: {eq: $dormitoryId}, status: {eq: "available"}}) {
+    id
+    machineNumber
+    capacity
+    model
+  }
+}
+
+mutation ReserveWashingMachine($washingMachineId: UUID!, $startTime: Timestamp!, $endTime: Timestamp!, $notes: String) @auth(level: USER) {
+  reservation_insert(data: {userId_expr: "auth.uid", washingMachineId: $washingMachineId, startTime: $startTime, endTime: $endTime, notes: $notes, status: "reserved", createdAt_expr: "request.time"})
+}
+
+mutation ResolveIssueReport($issueReportId: UUID!) @auth(level: USER) {
+  issueReport_update(id: $issueReportId, data: {status: "resolved", resolvedAt_expr: "request.time", resolvedById_expr: "auth.uid"})
+}
