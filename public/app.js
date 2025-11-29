@@ -1,7 +1,6 @@
 // app.js
 
-// Firebase modülleri (CDN üzerinden)
-// Sürüm: 10.12.5 (senin konsoldaki sürüm)
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
   getAuth,
@@ -16,7 +15,7 @@ import {
   onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-// Senin Firebase config'in (CDN sekmesinden birebir kopya)
+
 const firebaseConfig = {
   apiKey: "AIzaSyD8pcFbP4WANy68hDC1ohkM5DU_Rpx8EdA",
   authDomain: "washmate-227cf.firebaseapp.com",
@@ -27,12 +26,12 @@ const firebaseConfig = {
   measurementId: "G-L4FKW04DPB"
 };
 
-// Firebase başlat
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// DOM elemanları
+
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 const registerBtn = document.getElementById("registerBtn");
@@ -44,7 +43,7 @@ const userEmailSpan = document.getElementById("userEmail");
 const logoutBtn = document.getElementById("logoutBtn");
 const machinesTableBody = document.getElementById("machinesTableBody");
 
-// REGISTER
+
 registerBtn.addEventListener("click", () => {
   const email = emailInput.value;
   const pass = passwordInput.value;
