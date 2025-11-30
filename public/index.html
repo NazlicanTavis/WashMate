@@ -2,42 +2,320 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>WashMate</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WashMate - Smart Laundry</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    /* 1. MODERN RESET & VARIABLES */
+    :root {
+      --primary: #2563eb; /* Modern vibrant blue */
+      --secondary: #1e293b; /* Dark slate */
+      --accent: #3b82f6;
+      --bg-color: #f1f5f9;
+      --card-bg: rgba(255, 255, 255, 0.95);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+
+    body {
+      /* Elegant Mesh Gradient Background */
+      background-color: #e0e7ff;
+      background-image: radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                        radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+                        radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+      background-size: cover;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    /* 2. MAIN CONTAINER CARD */
+    .app-container {
+      width: 100%;
+      max-width: 480px; /* Slim and focused */
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    /* Used for wider dashboard view */
+    .app-container.dashboard-mode {
+      max-width: 1000px;
+      background: #ffffff;
+    }
+
+    /* 3. HEADER & TABS */
+    .header {
+      text-align: center;
+      padding: 30px 30px 20px 30px;
+      background: white;
+    }
+
+    .logo { font-size: 1.8rem; font-weight: 600; color: var(--secondary); margin-bottom: 5px; }
+    .logo i { color: var(--primary); }
+    .tagline { font-size: 0.9rem; color: #64748b; margin-bottom: 20px; }
+
+    /* The Pill Tabs */
+    .tabs {
+      display: flex;
+      background: #f1f5f9;
+      padding: 5px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      color: #64748b;
+      transition: all 0.2s;
+      font-size: 0.9rem;
+    }
+
+    .tab-btn.active {
+      background: white;
+      color: var(--primary);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      font-weight: 600;
+    }
+
+    /* 4. FORMS AREA */
+    .forms-area {
+      padding: 0 30px 40px 30px;
+    }
+
+    .auth-form {
+      display: none; /* Hidden by default */
+      animation: fadeIn 0.4s ease;
+    }
+    .auth-form.active { display: block; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Inputs */
+    .input-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.85rem; color: #334155; margin-bottom: 6px; font-weight: 500; }
+    
+    input, select {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      transition: border-color 0.2s;
+      background: #f8fafc;
+      color: #1e293b;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: white;
+    }
+
+    /* Grid for side-by-side inputs */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+    /* 5. BUTTONS */
+    .btn-main {
+      width: 100%;
+      padding: 14px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: transform 0.1s, background 0.2s;
+    }
+    .btn-main:hover { background: #1d4ed8; transform: translateY(-1px); }
+    
+    .btn-red { background: #ef4444; }
+    .btn-red:hover { background: #dc2626; }
+
+    /* 6. DASHBOARD STYLES (Hidden initially) */
+    .dashboard-view { display: none; padding: 30px; }
+    
+    .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #e2e8f0; padding-bottom: 20px; }
+    .dash-welcome h2 { font-size: 1.5rem; color: var(--secondary); }
+    .dash-welcome p { color: #64748b; font-size: 0.9rem; }
+
+    .machines-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .machine-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      transition: 0.3s;
+    }
+    .machine-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: var(--primary); }
+
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-top: 10px; }
+    .st-free { background: #dcfce7; color: #15803d; }
+    .st-busy { background: #fee2e2; color: #b91c1c; }
+
+    .btn-icon { background: #f1f5f9; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: #64748b; font-weight: 500; }
+    .btn-icon:hover { background: #e2e8f0; color: #0f172a; }
+
+  </style>
 </head>
 <body>
-  <h1>WashMate</h1>
 
-  <!-- AUTH SECTION -->
-  <div id="authSection">
-    <h2>Login / Register</h2>
-    <input id="email" type="email" placeholder="Email" />
-    <input id="password" type="password" placeholder="Password" />
-    <button id="registerBtn">Register</button>
-    <button id="loginBtn">Login</button>
+  <div class="app-container" id="mainAppContainer">
+    
+    <div id="authSection">
+      <div class="header">
+        <div class="logo"><i class="fa-solid fa-soap"></i> WashMate</div>
+        <p class="tagline">Dormitory Laundry Management</p>
+
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('login')">Login</button>
+          <button class="tab-btn" onclick="switchTab('student')">Student Sign Up</button>
+          <button class="tab-btn" onclick="switchTab('admin')">Admin</button>
+        </div>
+      </div>
+
+      <div class="forms-area">
+        
+        <div id="form-login" class="auth-form active">
+          <div class="input-group">
+            <label>Email Address</label>
+            <input type="email" id="loginEmail" placeholder="e.g. e1234567@metu.edu.tr">
+          </div>
+          <div class="input-group">
+            <label>Password</label>
+            <input type="password" id="loginPass" placeholder="••••••••">
+          </div>
+          <button class="btn-main" id="btnLogin">Log In</button>
+        </div>
+
+        <div id="form-student" class="auth-form">
+          <div class="grid-2">
+            <div class="input-group">
+              <label>First Name</label>
+              <input type="text" id="sFirstName" placeholder="Name">
+            </div>
+            <div class="input-group">
+              <label>Last Name</label>
+              <input type="text" id="sLastName" placeholder="Surname">
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Student ID</label>
+            <input type="text" id="sID" placeholder="2XXXXXX">
+          </div>
+
+          <div class="grid-2">
+            <div class="input-group">
+              <label>Dormitory</label>
+              <select id="sDorm">
+                <option>Dorm 1</option>
+                <option>Dorm 2</option>
+                <option>Dorm 3</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Block</label>
+              <select id="sBlock">
+                <option>A</option>
+                <option>B</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Email</label>
+            <input type="email" id="sEmail" placeholder="your.email@metu.edu.tr">
+          </div>
+          <div class="input-group">
+            <label>Password</label>
+            <input type="password" id="sPass" placeholder="Create a password">
+          </div>
+
+          <button class="btn-main" id="btnStudentReg">Create Student Account</button>
+        </div>
+
+        <div id="form-admin" class="auth-form">
+          <div class="input-group">
+            <label>Full Name</label>
+            <input type="text" id="aFullName" placeholder="Laundry Manager">
+          </div>
+          <div class="input-group">
+            <label>Admin Email</label>
+            <input type="email" id="aEmail" placeholder="admin@metu.edu.tr">
+          </div>
+          <div class="input-group">
+            <label>Password</label>
+            <input type="password" id="aPass" placeholder="••••••••">
+          </div>
+          <button class="btn-main btn-red" id="btnAdminReg">Create Admin Account</button>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="dashboardView" class="dashboard-view">
+      <div class="dash-header">
+        <div class="dash-welcome">
+          <h2 id="welcomeMsg">Hello, Student</h2>
+          <p id="userDormDisplay">Dormitory 1 - Block A</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <button id="addMachineBtn" class="btn-icon" style="color:green; display:none;" onclick="window.addMachine()">
+                <i class="fa-solid fa-plus"></i> Add
+            </button>
+            <button class="btn-icon" onclick="window.logout()">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </button>
+        </div>
+      </div>
+
+      <div id="machinesGrid" class="machines-grid">
+        </div>
+    </div>
+
   </div>
 
-  <!-- DASHBOARD SECTION -->
-  <div id="dashboardSection" style="display: none;">
-    <h2>Student Dashboard</h2>
-    <p>
-      Welcome, <span id="userEmail"></span>
-      <button id="logoutBtn">Logout</button>
-    </p>
+  <script>
+    function switchTab(tabName) {
+      // 1. Remove active class from all buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      // 2. Hide all forms
+      document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
 
-    <h3>Machines</h3>
-    <table border="1">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody id="machinesTableBody"></tbody>
-    </table>
-  </div>
+      // 3. Activate clicked tab
+      event.target.classList.add('active');
 
-  <!-- Uygulama JS -->
+      // 4. Show correct form
+      if(tabName === 'login') document.getElementById('form-login').classList.add('active');
+      if(tabName === 'student') document.getElementById('form-student').classList.add('active');
+      if(tabName === 'admin') document.getElementById('form-admin').classList.add('active');
+    }
+  </script>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>
