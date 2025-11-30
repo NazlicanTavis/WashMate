@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/fireba
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-// --- SENİN FIREBASE AYARLARIN ---
+//Firebase config to connect to project
 const firebaseConfig = {
     apiKey: "AIzaSyD8pcFbP4WANy68hDC1ohkM5DU_Rpx8EdA",
     authDomain: "washmate-227cf.firebaseapp.com",
@@ -13,25 +13,19 @@ const firebaseConfig = {
     measurementId: "G-L4FKW04DPB"
 };
 
-// Uygulamayı Başlat
+//Initilazte the application
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-console.log("WashMate Başarıyla Yüklendi!"); 
+console.log("WashMate loaded succesfully!"); 
 
-// ======================================================
-// 1. EKSİK OLAN KISIM: SEKME DEĞİŞTİRME (TAB) FONKSİYONU
-// ======================================================
+//This function şs to change between tabs
 window.switchTab = function(tabName) {
-    // Tüm butonların aktifliğini kaldır
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    // Tüm formları gizle
     document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
-
-    // İlgili butonu ve formu bulup aktif yap
     if(tabName === 'login') {
-        // Login sekmesini bul ve aktif yap
+        //find login tab and make it actgive
         const btns = document.querySelectorAll("button");
         btns.forEach(b => { if(b.innerText === 'Login') b.classList.add('active') });
         document.getElementById('form-login').classList.add('active');
@@ -48,7 +42,7 @@ window.switchTab = function(tabName) {
     }
 };
 
-// --- 2. ÖĞRENCİ KAYIT ---
+//student registration
 const btnStudentReg = document.getElementById('btnStudentReg');
 if(btnStudentReg) {
     btnStudentReg.addEventListener('click', async () => {
@@ -60,23 +54,23 @@ if(btnStudentReg) {
         const email = document.getElementById('sEmail').value;
         const pass = document.getElementById('sPass').value;
 
-        if(!email || !pass || !firstName) { alert("Lütfen tüm alanları doldurun!"); return; }
+        if(!email || !pass || !firstName) { alert("Please fill all the areas!"); return; }
 
         try {
             const cred = await createUserWithEmailAndPassword(auth, email, pass);
             await setDoc(doc(db, "users", cred.user.uid), {
                 firstName, lastName, studentID, dorm, block, email, role: "student"
             });
-            alert("Kayıt Başarılı! Giriş yapabilirsiniz.");
+            alert("Succesful Registration! You will be directed to login page.");
             window.location.reload();
         } catch (e) { 
             console.error(e);
-            alert("Hata: " + e.message); 
+            alert("Error: " + e.message); 
         }
     });
 }
 
-// --- 3. ADMIN KAYIT ---
+//admin registration
 const btnAdminReg = document.getElementById('btnAdminReg');
 if(btnAdminReg) {
     btnAdminReg.addEventListener('click', async () => {
@@ -84,18 +78,18 @@ if(btnAdminReg) {
         const email = document.getElementById('aEmail').value;
         const pass = document.getElementById('aPass').value;
 
-        if(!email || !pass) { alert("Eksik bilgi!"); return; }
+        if(!email || !pass) { alert("Please fill all the areas!"); return; }
 
         try {
             const cred = await createUserWithEmailAndPassword(auth, email, pass);
             await setDoc(doc(db, "users", cred.user.uid), { fullName, email, role: "admin" });
-            alert("Admin Kaydı Başarılı!");
+            alert("Admin Registration Succesful!");
             window.location.reload();
-        } catch (e) { alert("Hata: " + e.message); }
+        } catch (e) { alert("Error: " + e.message); }
     });
 }
 
-// --- 4. GİRİŞ YAPMA (LOGIN) ---
+//Login
 const btnLogin = document.getElementById('btnLogin');
 if(btnLogin) {
     btnLogin.addEventListener('click', async () => {
@@ -105,21 +99,19 @@ if(btnLogin) {
         try {
             const cred = await signInWithEmailAndPassword(auth, email, pass);
             checkUserRole(cred.user.uid);
-        } catch (e) { alert("Giriş Hatalı: " + e.message); }
+        } catch (e) { alert("Error in Login: " + e.message); }
     });
 }
 
-// --- 5. ROL KONTROLÜ VE EKRAN DEĞİŞİMİ ---
+//change of role and tab differentiate
 async function checkUserRole(uid) {
     const docSnap = await getDoc(doc(db, "users", uid));
     if (docSnap.exists()) {
         const data = docSnap.data();
         
-        // Giriş ekranını gizle, Paneli aç
+        //open the panel and make the dashboard visible
         document.getElementById('authSection').style.display = 'none';
         document.getElementById('dashboardView').style.display = 'block';
-        
-        // CSS class ekle (geniş görünüm için)
         const container = document.getElementById('mainAppContainer');
         if(container) container.classList.add('dashboard-mode');
 
@@ -128,21 +120,21 @@ async function checkUserRole(uid) {
     }
 }
 
-// --- EKRAN AYARLARI ---
+//screen settings
 function setupStudentView(user) {
-    document.getElementById('welcomeMsg').innerText = `Merhaba, ${user.firstName || 'Öğrenci'}`;
+    document.getElementById('welcomeMsg').innerText = `Hello, ${user.firstName || 'Student'}`;
     const dormInfo = document.getElementById('userDormDisplay');
     if(dormInfo) dormInfo.innerText = `${user.dorm || ''} • Blok ${user.block || ''}`;
     loadMachines(false);
 }
 
 function setupAdminView(user) {
-    document.getElementById('welcomeMsg').innerText = `Yönetici Paneli`;
+    document.getElementById('welcomeMsg').innerText = `Admin Panel`;
     const dormInfo = document.getElementById('userDormDisplay');
-    if(dormInfo) dormInfo.innerText = `Sistem Yöneticisi`;
+    if(dormInfo) dormInfo.innerText = `Sistem Administrator`;
     
     const addBtn = document.getElementById('addMachineBtn');
-    if(addBtn) addBtn.style.display = 'block'; // Admin butonunu göster
+    if(addBtn) addBtn.style.display = 'block'; 
     loadMachines(true);
 }
 
@@ -154,7 +146,7 @@ function loadMachines(isAdmin) {
             const m = d.data();
             const statusClass = m.status === 'available' ? 'st-free' : 'st-busy';
             
-            // Silme butonu (Sadece Admin için)
+            //delete button for admin
             const deleteBtn = isAdmin ? `<button onclick="window.deleteMachine('${d.id}')" style="color:red;float:right;border:none;background:none;cursor:pointer;"><i class="fa-solid fa-trash"></i></button>` : '';
 
             grid.innerHTML += `
@@ -169,12 +161,12 @@ function loadMachines(isAdmin) {
     });
 }
 
-// --- GLOBAL FONKSİYONLAR ---
+//global functions
 window.logout = () => signOut(auth).then(() => location.reload());
 window.addMachine = async () => {
-    const name = prompt("Makine Adı:");
+    const name = prompt("Machine Name:");
     if(name) await addDoc(collection(db, "machines"), { name, type: 'Washing', status: 'available' });
 };
 window.deleteMachine = async (id) => {
-    if(confirm("Silmek istiyor musun?")) await deleteDoc(doc(db, "machines", id));
+    if(confirm("Do you want to delete?")) await deleteDoc(doc(db, "machines", id));
 };
