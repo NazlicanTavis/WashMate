@@ -24,7 +24,7 @@
 ---
 
 ## Technologies Used
-[cite_start]The project is built using a Client-Side Web Application architecture powered by Google Firebase services:
+The project is built using a Client-Side Web Application architecture powered by Google Firebase services:
 
 * **Frontend:** HTML5, CSS3, JavaScript (Vanilla)
 * **Authentication:** Firebase Authentication (Email/Password)
@@ -36,19 +36,11 @@
 
 ## How to Run the Project
 1.  Clone the repository:
-    ```bash
-    git clone [https://github.com/NazlicanTavis/WashMate.git](https://github.com/NazlicanTavis/WashMate.git)
-    ```
+    git clone https://github.com/NazlicanTavis/WashMate.git
 2.  Navigate to the code directory:
-    ```bash
     cd code
-    ```
 3.  Install Firebase tools (if not installed):
-    ```bash
     npm install -g firebase-tools
-    ```
 4.  Run the local server:
-    ```bash
     firebase serve
-    ```
 5.  Open `http://localhost:5000` in your browser.
