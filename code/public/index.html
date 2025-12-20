@@ -11,8 +11,8 @@
   <style>
     /* 1. MODERN RESET & VARIABLES */
     :root {
-      --primary: #2563eb; /* Modern vibrant blue */
-      --secondary: #1e293b; /* Dark slate */
+      --primary: #2563eb; 
+      --secondary: #1e293b; 
       --accent: #3b82f6;
       --bg-color: #f1f5f9;
       --card-bg: rgba(255, 255, 255, 0.95);
@@ -21,7 +21,6 @@
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
 
     body {
-      /* Elegant Mesh Gradient Background */
       background-color: #e0e7ff;
       background-image: radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
                         radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
@@ -37,7 +36,7 @@
     /* 2. MAIN CONTAINER CARD */
     .app-container {
       width: 100%;
-      max-width: 480px; /* Slim and focused */
+      max-width: 480px;
       background: var(--card-bg);
       backdrop-filter: blur(20px);
       border-radius: 24px;
@@ -64,7 +63,6 @@
     .logo i { color: var(--primary); }
     .tagline { font-size: 0.9rem; color: #64748b; margin-bottom: 20px; }
 
-    /* The Pill Tabs */
     .tabs {
       display: flex;
       background: #f1f5f9;
@@ -94,19 +92,11 @@
     }
 
     /* 4. FORMS AREA */
-    .forms-area {
-      padding: 0 30px 40px 30px;
-    }
-
-    .auth-form {
-      display: none; /* Hidden by default */
-      animation: fadeIn 0.4s ease;
-    }
+    .forms-area { padding: 0 30px 40px 30px; }
+    .auth-form { display: none; animation: fadeIn 0.4s ease; }
     .auth-form.active { display: block; }
-
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* Inputs */
     .input-group { margin-bottom: 16px; }
     label { display: block; font-size: 0.85rem; color: #334155; margin-bottom: 6px; font-weight: 500; }
     
@@ -127,7 +117,6 @@
       background: white;
     }
 
-    /* Grid for side-by-side inputs */
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 
     /* 5. BUTTONS */
@@ -145,11 +134,10 @@
       transition: transform 0.1s, background 0.2s;
     }
     .btn-main:hover { background: #1d4ed8; transform: translateY(-1px); }
-    
     .btn-red { background: #ef4444; }
     .btn-red:hover { background: #dc2626; }
 
-    /* 6. DASHBOARD STYLES (Hidden initially) */
+    /* 6. DASHBOARD STYLES */
     .dashboard-view { display: none; padding: 30px; }
     
     .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #e2e8f0; padding-bottom: 20px; }
@@ -181,6 +169,7 @@
 
   </style>
 </head>
+
 <body>
 
   <div class="app-container" id="mainAppContainer">
@@ -278,18 +267,52 @@
     </div>
 
     <div id="dashboardView" class="dashboard-view">
+      
       <div class="dash-header">
         <div class="dash-welcome">
           <h2 id="welcomeMsg">Hello, Student</h2>
           <p id="userDormDisplay">Dormitory 1 - Block A</p>
         </div>
-        <div style="display:flex; gap:10px;">
+        <div style="display:flex; gap:10px; align-items:center;">
+            
+            <button class="btn-icon" onclick="document.getElementById('rulesModal').style.display='flex'" title="Laundry Rules">
+                <i class="fa-solid fa-file-contract"></i> Rules
+            </button>
+
+            <button class="btn-icon" onclick="document.getElementById('contactModal').style.display='flex'" title="Contact Info">
+                <i class="fa-solid fa-location-dot"></i> Contact
+            </button>
+
             <button id="addMachineBtn" class="btn-icon" style="color:green; display:none;" onclick="window.addMachine()">
                 <i class="fa-solid fa-plus"></i> Add
             </button>
+
             <button class="btn-icon" onclick="window.logout()">
                 <i class="fa-solid fa-right-from-bracket"></i> Logout
             </button>
+        </div>
+      </div>
+
+      <div id="adminPanelControls" style="display: none; background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+        <h3 style="font-size: 1rem; color: #475569; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+             <i class="fa-solid fa-gear"></i> Admin System Controls
+        </h3>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+             <button id="btnInitialize" class="btn-main" style="background-color: #f59e0b; width: auto; margin: 0; font-size: 0.9rem;">
+                 <i class="fa-solid fa-server"></i> Initialize
+             </button>
+             
+             <button id="btnReset" class="btn-main" style="background-color: #ef4444; width: auto; margin: 0; font-size: 0.9rem;">
+                 <i class="fa-solid fa-rotate-right"></i> Reset All
+             </button>
+             
+             <button id="btnBackup" class="btn-main" style="background-color: #10b981; width: auto; margin: 0; font-size: 0.9rem;">
+                 <i class="fa-solid fa-download"></i> Backup
+             </button>
+             
+             <button id="btnNoShow" class="btn-main" style="background-color: #7f1d1d; width: auto; margin: 0; font-size: 0.9rem;">
+              <i class="fa-solid fa-clock"></i> Check No-Shows
+             </button>
         </div>
       </div>
 
@@ -299,23 +322,71 @@
 
   </div>
 
+  <div id="rulesModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;">
+    <div style="background:white; padding:30px; border-radius:16px; max-width:400px; width:90%; position:relative; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <button onclick="document.getElementById('rulesModal').style.display='none'" style="position:absolute; top:10px; right:15px; border:none; background:none; font-size:1.5rem; cursor:pointer; color:#64748b;">&times;</button>
+        
+        <h2 style="color:#2563eb; margin-bottom:15px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+            <i class="fa-solid fa-clipboard-list"></i> Laundry Rules
+        </h2>
+        <ul style="line-height:1.8; color:#475569; margin-left:20px; font-size:0.95rem;">
+            <li>Washing cycle takes approx. 32 mins.</li>
+            <li>Drying cycle takes approx. 32 mins.</li>
+            <li>Please empty the machine immediately.</li>
+            <li>Do not use machines marked as "Maintenance".</li>
+            <li>Clean the lint filter after drying.</li>
+        </ul>
+        <button class="btn-main" onclick="document.getElementById('rulesModal').style.display='none'" style="margin-top:20px;">Close</button>
+    </div>
+  </div>
+
+  <div id="contactModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;">
+    <div style="background:white; padding:30px; border-radius:16px; max-width:400px; width:90%; position:relative; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <button onclick="document.getElementById('contactModal').style.display='none'" style="position:absolute; top:10px; right:15px; border:none; background:none; font-size:1.5rem; cursor:pointer; color:#64748b;">&times;</button>
+        
+        <h2 style="color:#2563eb; margin-bottom:15px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+            <i class="fa-solid fa-building"></i> Service Info
+        </h2>
+        
+        <div style="color:#475569; line-height:1.6; font-size:0.95rem;">
+            <p style="margin-bottom:15px;">
+                <strong><i class="fa-solid fa-map-pin"></i> Address:</strong><br>
+                METU NCC Akçın Building,<br>
+                Laundry Building, Ground Floor,<br>
+                Kalkanlı, Güzelyurt / TRNC
+            </p>
+            
+            <p style="margin-bottom:15px;">
+                <strong><i class="fa-solid fa-phone"></i> Phone:</strong><br>
+                <a href="tel:+901234567891" style="color:#2563eb; text-decoration:none;">+90 123 4567 891</a>
+            </p>
+
+            <p>
+                <strong><i class="fa-solid fa-envelope"></i> Email:</strong><br>
+                <a href="mailto:laundry@metu.edu.tr" style="color:#2563eb; text-decoration:none;">laundry@metu.edu.tr</a>
+            </p>
+
+            <div style="margin-top:15px; padding:10px; background:#f0f9ff; border-radius:8px; border:1px solid #bae6fd; font-size:0.85rem;">
+                <i class="fa-solid fa-clock"></i> <strong>Working Hours:</strong><br>
+                Mon - Sun: 08:00 - 17:00
+            </div>
+        </div>
+
+        <button class="btn-main" onclick="document.getElementById('contactModal').style.display='none'" style="margin-top:20px;">Close</button>
+    </div>
+  </div>
+
   <script>
     function switchTab(tabName) {
-      // 1. Remove active class from all buttons
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      // 2. Hide all forms
       document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
-
-      // 3. Activate clicked tab
       event.target.classList.add('active');
-
-      // 4. Show correct form
       if(tabName === 'login') document.getElementById('form-login').classList.add('active');
       if(tabName === 'student') document.getElementById('form-student').classList.add('active');
       if(tabName === 'admin') document.getElementById('form-admin').classList.add('active');
     }
   </script>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
