@@ -1,6 +1,16 @@
+/**
+ * WASHMATE APP - V2 (With Approval System)
+ * -----------------------------
+ * Features:
+ * 1. Admin Panel with "Add Machine" Modal Form.
+ * 2. User Approval System (Approve/Reject).
+ * 3. Student Booking & Reporting.
+ */
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, deleteDoc, writeBatch, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+// UPDATED IMPORTS: Added 'query' and 'where'
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, deleteDoc, writeBatch, getDocs, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 
 //Firebase config
@@ -41,7 +51,9 @@ window.switchTab = function(tabName) {
     }
 };
 
-// Student Reg
+// ==========================================
+// ⚠️ UPDATED: STUDENT REGISTRATION (PENDING STATUS)
+// ==========================================
 const btnStudentReg = document.getElementById('btnStudentReg');
 if(btnStudentReg) {
     btnStudentReg.addEventListener('click', async () => {
@@ -57,10 +69,20 @@ if(btnStudentReg) {
 
         try {
             const cred = await createUserWithEmailAndPassword(auth, email, pass);
+            
+            // Set status to 'pending' by default
             await setDoc(doc(db, "users", cred.user.uid), {
-                firstName, lastName, studentID, dorm, block, email, role: "student"
+                firstName, 
+                lastName, 
+                studentID, 
+                dorm, 
+                block, 
+                email, 
+                role: "student",
+                status: "pending" // <--- NEW FIELD
             });
-            alert("Registration Successful! Redirecting to login page...");
+
+            alert("✅ Registration Successful!\n\nYour account is currently PENDING approval from the Administrator. You cannot login until approved.");
             window.location.reload();
         } catch (e) { 
             console.error(e);
@@ -81,7 +103,13 @@ if(btnAdminReg) {
 
         try {
             const cred = await createUserWithEmailAndPassword(auth, email, pass);
-            await setDoc(doc(db, "users", cred.user.uid), { fullName, email, role: "admin" });
+            // Admins are auto-approved for now, or you can make them pending too
+            await setDoc(doc(db, "users", cred.user.uid), { 
+                fullName, 
+                email, 
+                role: "admin", 
+                status: "approved" 
+            });
             alert("Admin Registration Successful!");
             window.location.reload();
         } catch (e) { alert("Error: " + e.message); }
@@ -102,12 +130,29 @@ if(btnLogin) {
     });
 }
 
-// Check Role
+// ==========================================
+// ⚠️ UPDATED: LOGIN CHECK (BLOCK PENDING USERS)
+// ==========================================
 async function checkUserRole(uid) {
     const docSnap = await getDoc(doc(db, "users", uid));
+    
     if (docSnap.exists()) {
         const data = docSnap.data();
+
+        // 1. Check Approval Status
+        if (data.status === 'pending') {
+            alert("⏳ Account Pending Approval\n\nThe administrator has not approved your account yet. Please try again later.");
+            await signOut(auth); // Log them out immediately
+            return;
+        }
+
+        if (data.status === 'rejected') {
+            alert("🚫 Account Rejected\n\nYour registration request was rejected by the administrator.");
+            await signOut(auth);
+            return;
+        }
         
+        // 2. If Approved, Proceed
         document.getElementById('authSection').style.display = 'none';
         document.getElementById('dashboardView').style.display = 'block';
         const container = document.getElementById('mainAppContainer');
@@ -115,6 +160,9 @@ async function checkUserRole(uid) {
 
         if (data.role === 'admin') setupAdminView(data);
         else setupStudentView(data);
+    } else {
+        alert("User data not found in database.");
+        await signOut(auth);
     }
 }
 
@@ -133,6 +181,10 @@ function setupStudentView(user) {
     const adminControls = document.getElementById('adminPanelControls');
     if(adminControls) adminControls.style.display = 'none';
     
+    // Hide Admin Approval Section for Students
+    const approvalSection = document.getElementById('adminApprovalsSection');
+    if(approvalSection) approvalSection.style.display = 'none';
+    
     const addBtn = document.getElementById('addMachineBtn');
     if(addBtn) addBtn.style.display = 'none';
 
@@ -150,10 +202,81 @@ function setupAdminView(user) {
     const adminControls = document.getElementById('adminPanelControls');
     if(adminControls) adminControls.style.display = 'block';
 
+    // Show Approval Section
+    const approvalSection = document.getElementById('adminApprovalsSection');
+    if(approvalSection) approvalSection.style.display = 'block';
+
+    // Load Data
     loadMachines(true);
+    loadPendingUsers(); // <--- NEW FUNCTION CALL
 }
 
-// --- Load Machines (Updated to display Brand/Capacity) ---
+// ==========================================
+// ⚠️ NEW: ADMIN APPROVAL SYSTEM LOGIC
+// ==========================================
+
+function loadPendingUsers() {
+    // Listen specifically for users where status == 'pending'
+    const q = query(collection(db, "users"), where("status", "==", "pending"));
+
+    onSnapshot(q, (snapshot) => {
+        const grid = document.getElementById('pendingUsersGrid');
+        if(!grid) return;
+        
+        grid.innerHTML = ""; // Clear current list
+
+        if (snapshot.empty) {
+            grid.innerHTML = `<p style="color:#64748b; font-style:italic;">No pending approvals.</p>`;
+            return;
+        }
+
+        snapshot.forEach(docSnap => {
+            const u = docSnap.data();
+            const uid = docSnap.id;
+
+            // Create a nice card for the pending user
+            const card = document.createElement('div');
+            card.style = "background:white; border:1px solid #e2e8f0; padding:15px; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.05);";
+            
+            card.innerHTML = `
+                <div style="font-weight:bold; color:#1e293b; margin-bottom:5px;">${u.firstName} ${u.lastName}</div>
+                <div style="font-size:0.85rem; color:#64748b; margin-bottom:2px;">ID: ${u.studentID}</div>
+                <div style="font-size:0.85rem; color:#64748b; margin-bottom:10px;">${u.dorm}, Block ${u.block}</div>
+                <div style="display:flex; gap:10px;">
+                    <button onclick="window.approveUser('${uid}')" style="flex:1; background:#16a34a; color:white; border:none; padding:8px; border-radius:6px; cursor:pointer; font-weight:600;">Approve</button>
+                    <button onclick="window.rejectUser('${uid}')" style="flex:1; background:#ef4444; color:white; border:none; padding:8px; border-radius:6px; cursor:pointer; font-weight:600;">Reject</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    });
+}
+
+// Global functions for the buttons
+window.approveUser = async (uid) => {
+    if(!confirm("Approve this student?")) return;
+    try {
+        await updateDoc(doc(db, "users", uid), { status: 'approved' });
+        // Alert is optional, the UI will update automatically due to onSnapshot
+    } catch(e) {
+        alert("Error approving: " + e.message);
+    }
+};
+
+window.rejectUser = async (uid) => {
+    if(!confirm("Reject (Delete) this registration request?")) return;
+    try {
+        // We simply delete the user document. 
+        // Note: The Auth user still exists in Firebase Auth but they can't log in because checkUserRole fails.
+        // For a full clean up, you'd need Cloud Functions, but this is sufficient for this scope.
+        await deleteDoc(doc(db, "users", uid));
+    } catch(e) {
+        alert("Error rejecting: " + e.message);
+    }
+};
+
+
+// --- Load Machines ---
 function loadMachines(isAdmin) {
     onSnapshot(collection(db, "machines"), (snapshot) => {
         const grid = document.getElementById('machinesGrid');
@@ -242,23 +365,18 @@ function loadMachines(isAdmin) {
 window.logout = () => signOut(auth).then(() => location.reload());
 
 // =======================================================
-// ⚠️ CHANGED: ADD MACHINE NOW OPENS THE MODAL (NO PROMPTS)
+// ADD MACHINE MODAL
 // =======================================================
-
-// 1. This function is called by the "+ Add" button in HTML
 window.addMachine = function() {
-    // Simply show the hidden div
     const modal = document.getElementById('addMachineModal');
     if(modal) modal.style.display = 'flex';
 };
 
-// 2. Logic to Save Data when "Add Machine" button INSIDE modal is clicked
 const btnSaveMachine = document.getElementById('btnSaveMachine');
 const btnCancelAdd = document.getElementById('btnCancelAdd');
 
 if(btnSaveMachine) {
     btnSaveMachine.addEventListener('click', async () => {
-        // Get data from the form inputs
         const nameVal = document.getElementById('newM_Name').value;
         const brandVal = document.getElementById('newM_Brand').value;
         const typeVal = document.getElementById('newM_Type').value;
@@ -278,13 +396,10 @@ if(btnSaveMachine) {
                 status: 'available',
                 usageCount: 0
             });
-            
-            // Close Modal & Clear Inputs
             document.getElementById('addMachineModal').style.display = 'none';
             document.getElementById('newM_Name').value = "";
             document.getElementById('newM_Brand').value = "";
             document.getElementById('newM_Cap').value = "";
-            
         } catch(error) {
             console.error("Error adding machine: ", error);
             alert("Error: " + error.message);
@@ -292,276 +407,150 @@ if(btnSaveMachine) {
     });
 }
 
-// 3. Logic to Close Modal on Cancel
 if(btnCancelAdd) {
     btnCancelAdd.addEventListener('click', () => {
         document.getElementById('addMachineModal').style.display = 'none';
     });
 }
 
-
 // ==========================================
-// ⚠️ ADMIN ADVANCED FEATURES
+// ADMIN ADVANCED FEATURES
 // ==========================================
 
 window.initializeDatabase = async function() {
-    const confirmInit = confirm("WARNING: This will automatically add 10 test machines to the database. Do you want to proceed?");
+    const confirmInit = confirm("WARNING: This will automatically add 10 test machines. Proceed?");
     if (!confirmInit) return;
-
     try {
         const batch = writeBatch(db); 
-
         for (let i = 1; i <= 5; i++) {
-            const washerRef = doc(collection(db, "machines"));
-            batch.set(washerRef, {
-                type: "Washer",
-                name: `Washer #${i}`,
-                brand: "Samsung", 
-                capacity: "9",
-                status: "available",
+            batch.set(doc(collection(db, "machines")), {
+                type: "Washer", name: `Washer #${i}`, brand: "Samsung", capacity: "9", status: "available"
             });
-
-            const dryerRef = doc(collection(db, "machines"));
-            batch.set(dryerRef, {
-                type: "Dryer",
-                name: `Dryer #${i}`,
-                brand: "LG",
-                capacity: "8",
-                status: "available",
+            batch.set(doc(collection(db, "machines")), {
+                type: "Dryer", name: `Dryer #${i}`, brand: "LG", capacity: "8", status: "available"
             });
         }
-
         await batch.commit(); 
-        alert("✅ Success! 10 machines have been added to the database.");
-    } catch (error) {
-        console.error("Init Error:", error);
-        alert("Error: " + error.message);
-    }
+        alert("✅ Success! 10 machines added.");
+    } catch (error) { console.error("Init Error:", error); alert("Error: " + error.message); }
 }
 
 window.resetSystem = async function() {
-    const confirmReset = confirm("WARNING: All machines will be reset to 'Available' status. Are you sure?");
+    const confirmReset = confirm("WARNING: Reset all machines to 'Available'?");
     if (!confirmReset) return;
-
     try {
         const querySnapshot = await getDocs(collection(db, "machines"));
         const batch = writeBatch(db);
-
         querySnapshot.forEach((doc) => {
-            batch.update(doc.ref, { 
-                status: "available",
-                startTime: null,
-                userId: null 
-            });
+            batch.update(doc.ref, { status: "available", startTime: null, userId: null });
         });
-
         await batch.commit();
-        alert("✅ System Reset! All machines are now available.");
-    } catch (error) {
-        console.error("Reset Error:", error);
-        alert("Reset failed: " + error.message);
-    }
+        alert("✅ System Reset!");
+    } catch (error) { console.error("Reset Error:", error); alert("Reset failed: " + error.message); }
 }
 
 window.backupData = async function() {
     try {
         const querySnapshot = await getDocs(collection(db, "machines"));
         let data = [];
-
-        querySnapshot.forEach((doc) => {
-            data.push({ id: doc.id, ...doc.data() });
-        });
-
-        const jsonString = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonString], { type: "application/json" });
+        querySnapshot.forEach((doc) => { data.push({ id: doc.id, ...doc.data() }); });
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
-        
         const a = document.createElement('a');
         a.href = url;
-        a.download = "washmate_backup_" + new Date().toISOString().slice(0,10) + ".json";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        alert("✅ Data backup downloaded successfully!");
-    } catch (error) {
-        console.error("Backup Error:", error);
-        alert("Backup failed: " + error.message);
-    }
+        a.download = "washmate_backup.json";
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        alert("✅ Backup downloaded!");
+    } catch (error) { console.error("Backup Error:", error); alert("Backup failed: " + error.message); }
 }
 
 const btnInit = document.getElementById('btnInitialize');
 if(btnInit) btnInit.addEventListener('click', window.initializeDatabase);
-
 const btnReset = document.getElementById('btnReset');
 if(btnReset) btnReset.addEventListener('click', window.resetSystem);
-
 const btnBackup = document.getElementById('btnBackup');
 if(btnBackup) btnBackup.addEventListener('click', window.backupData);
-
 const btnNoShow = document.getElementById('btnNoShow');
 if(btnNoShow) btnNoShow.addEventListener('click', window.checkNoShows);
 
-
 // ==========================================
-// ⚠️ BOOKING SYSTEM LOGIC
+// BOOKING & REPORTING LOGIC
 // ==========================================
 
 window.bookMachine = async function(machineId) {
     const user = auth.currentUser;
     if (!user) { alert("Please login first!"); return; }
-
     try {
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists() && userSnap.data().noShowCount >= 3) {
-            alert("⚠️ WARNING: You have 3 or more 'No-Show' penalties. Please be careful!");
+            alert("⚠️ WARNING: You have 3 or more 'No-Show' penalties.");
         }
-
-        const machineRef = doc(db, "machines", machineId);
-        
-        await updateDoc(machineRef, {
-            status: 'reserved',
-            userId: user.uid,
-            userEmail: user.email, 
-            startTime: new Date().toISOString()
+        await updateDoc(doc(db, "machines", machineId), {
+            status: 'reserved', userId: user.uid, userEmail: user.email, startTime: new Date().toISOString()
         });
-        
-        alert("✅ Reserved! You have 5 MINUTES to click 'Start Washing', otherwise it will be cancelled.");
-    } catch (error) {
-        console.error("Booking Error:", error);
-        alert("Error: " + error.message);
-    }
+        alert("✅ Reserved! You have 5 MINUTES to start.");
+    } catch (error) { console.error("Booking Error:", error); alert("Error: " + error.message); }
 }
 
 window.startMachine = async function(machineId) {
     try {
         const machineRef = doc(db, "machines", machineId);
         const docSnap = await getDoc(machineRef);
-        const currentData = docSnap.data();
-        const currentCount = currentData.usageCount || 0;
-
-        await updateDoc(machineRef, {
-            status: 'in_use',
-            usageCount: currentCount + 1 
-        });
-        
-        alert("✅ Machine Started! Cycle is running.");
-    } catch (error) {
-        console.error("Start Error:", error);
-        alert("Error: " + error.message);
-    }
+        await updateDoc(machineRef, { status: 'in_use', usageCount: (docSnap.data().usageCount || 0) + 1 });
+        alert("✅ Machine Started!");
+    } catch (error) { console.error("Start Error:", error); alert("Error: " + error.message); }
 }
 
 window.finishMachine = async function(machineId) {
-    const confirmFinish = confirm("Have you finished your laundry? The machine will be available for others.");
-    if (!confirmFinish) return;
-
+    if (!confirm("Finish laundry?")) return;
     try {
-        const machineRef = doc(db, "machines", machineId);
-
-        await updateDoc(machineRef, {
-            status: 'available',
-            userId: null,
-            userEmail: null,
-            startTime: null
-        });
-
-        alert("✅ Laundry finished! Machine is now available.");
-    } catch (error) {
-        console.error("Finish Error:", error);
-        alert("Error: " + error.message);
-    }
+        await updateDoc(doc(db, "machines", machineId), { status: 'available', userId: null, userEmail: null, startTime: null });
+        alert("✅ Laundry finished!");
+    } catch (error) { console.error("Finish Error:", error); alert("Error: " + error.message); }
 }
 
 window.reportMachine = async function(machineId) {
-    const confirmReport = confirm("Are you sure you want to report an issue with this machine? It will be marked as 'Maintenance'.");
-    if (!confirmReport) return;
-
+    if (!confirm("Report issue?")) return;
     try {
-        const machineRef = doc(db, "machines", machineId);
-        
-        await updateDoc(machineRef, {
-            status: 'disabled',       
-            userId: null,            
-            startTime: null
-        });
-        
-        alert("⚠️ Machine reported as broken. Admin has been notified.");
-    } catch (error) {
-        console.error("Report Error:", error);
-        alert("Error: " + error.message);
-    }
+        await updateDoc(doc(db, "machines", machineId), { status: 'disabled', userId: null, startTime: null });
+        alert("⚠️ Machine reported as broken.");
+    } catch (error) { console.error("Report Error:", error); alert("Error: " + error.message); }
 }
 
 window.fixMachine = async function(machineId) {
-    const confirmFix = confirm("Has the issue been resolved? Machine will be marked as 'Available'.");
-    if (!confirmFix) return;
-
+    if (!confirm("Mark as Fixed?")) return;
     try {
-        const machineRef = doc(db, "machines", machineId);
-        
-        await updateDoc(machineRef, {
-            status: 'available'
-        });
-        
-        alert("✅ Machine is now fixed and available for students.");
-    } catch (error) {
-        console.error("Fix Error:", error);
-        alert("Error: " + error.message);
-    }
+        await updateDoc(doc(db, "machines", machineId), { status: 'available' });
+        alert("✅ Machine fixed.");
+    } catch (error) { console.error("Fix Error:", error); alert("Error: " + error.message); }
 }
 
 window.checkNoShows = async function() {
-    const confirmCheck = confirm("System will check for expired reservations (>5 mins) and penalize users. Proceed?");
-    if (!confirmCheck) return;
-
+    if (!confirm("Check for expired reservations?")) return;
     try {
         const querySnapshot = await getDocs(collection(db, "machines"));
         const batch = writeBatch(db);
         const now = new Date();
         let expiredCount = 0;
-
         for (const docSnapshot of querySnapshot.docs) {
             const m = docSnapshot.data();
-            
             if (m.status === 'reserved' && m.startTime) {
-                const reservedTime = new Date(m.startTime);
-                const diffMinutes = (now - reservedTime) / 1000 / 60; 
-
-                if (diffMinutes > 5) {
-                    batch.update(docSnapshot.ref, {
-                        status: 'available',
-                        userId: null,
-                        startTime: null
-                    });
-
+                if ((now - new Date(m.startTime)) / 1000 / 60 > 5) {
+                    batch.update(docSnapshot.ref, { status: 'available', userId: null, startTime: null });
                     if (m.userId) {
                         const userRef = doc(db, "users", m.userId);
                         const userSnap = await getDoc(userRef);
-                        if (userSnap.exists()) {
-                            const currentPenalties = userSnap.data().noShowCount || 0;
-                            batch.update(userRef, { noShowCount: currentPenalties + 1 });
-                        }
+                        if (userSnap.exists()) batch.update(userRef, { noShowCount: (userSnap.data().noShowCount || 0) + 1 });
                     }
                     expiredCount++;
                 }
             }
         }
-
-        if (expiredCount > 0) {
-            await batch.commit();
-            alert(`✅ Done! ${expiredCount} expired reservations cancelled and users penalized.`);
-            loadMachines(true); 
-        } else {
-            alert("No expired reservations found.");
-        }
-
-    } catch (error) {
-        console.error("No-Show Check Error:", error);
-        alert("Error: " + error.message);
-    }
+        if (expiredCount > 0) { await batch.commit(); alert(`✅ ${expiredCount} expired reservations cancelled.`); loadMachines(true); } 
+        else { alert("No expired reservations found."); }
+    } catch (error) { console.error("No-Show Check Error:", error); alert("Error: " + error.message); }
 }
 
 window.deleteMachine = async (id) => {
-    if(confirm("Are you sure you want to delete this machine?")) await deleteDoc(doc(db, "machines", id));
+    if(confirm("Delete machine?")) await deleteDoc(doc(db, "machines", id));
 };
