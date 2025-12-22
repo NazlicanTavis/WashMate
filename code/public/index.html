@@ -376,6 +376,44 @@
     </div>
   </div>
 
+    <div id="addMachineModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:2000;">
+    <div style="background:white; padding:30px; border-radius:24px; max-width:400px; width:90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
+        
+        <h2 style="color:#1e293b; margin-bottom:20px; text-align:center;">Add New Machine</h2>
+
+        <div class="input-group">
+            <label style="font-weight:600; margin-bottom:5px; display:block;">Machine Name</label>
+            <input type="text" id="newM_Name" placeholder="e.g. Washer 01" style="width:100%; padding:10px; border:2px solid #e2e8f0; border-radius:10px;">
+        </div>
+
+        <div class="input-group" style="margin-top:15px;">
+            <label style="font-weight:600; margin-bottom:5px; display:block;">Brand</label>
+            <input type="text" id="newM_Brand" placeholder="e.g. Samsung" style="width:100%; padding:10px; border:2px solid #e2e8f0; border-radius:10px;">
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:15px;">
+            <div class="input-group">
+                <label style="font-weight:600; margin-bottom:5px; display:block;">Type</label>
+                <select id="newM_Type" style="width:100%; padding:10px; border:2px solid #e2e8f0; border-radius:10px;">
+                    <option value="Washer">Washer</option>
+                    <option value="Dryer">Dryer</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label style="font-weight:600; margin-bottom:5px; display:block;">Capacity (kg)</label>
+                <input type="number" id="newM_Cap" placeholder="e.g. 9" style="width:100%; padding:10px; border:2px solid #e2e8f0; border-radius:10px;">
+            </div>
+        </div>
+
+        <div style="margin-top:25px; display:flex; gap:10px;">
+            <button id="btnCancelAdd" style="flex:1; padding:12px; border:none; background:#cbd5e1; color:#334155; border-radius:10px; cursor:pointer; font-weight:600;">Cancel</button>
+            <button id="btnSaveMachine" style="flex:1; padding:12px; border:none; background:#2563eb; color:white; border-radius:10px; cursor:pointer; font-weight:600;">Add Machine</button>
+        </div>
+
+    </div>
+  </div>
+
+
   <script>
     function switchTab(tabName) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));

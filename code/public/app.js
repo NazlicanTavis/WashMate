@@ -1,10 +1,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-// DÜZELTME: 'updateDoc' buraya eklendi!
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, deleteDoc, writeBatch, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 
-//Firebase config to connect to project
+//Firebase config
 const firebaseConfig = {
     apiKey: "AIzaSyD8pcFbP4WANy68hDC1ohkM5DU_Rpx8EdA",
     authDomain: "washmate-227cf.firebaseapp.com",
@@ -15,14 +14,13 @@ const firebaseConfig = {
     measurementId: "G-L4FKW04DPB"
 };
 
-//Initialize the application
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 console.log("WashMate loaded succesfully!"); 
 
-//This function is to change between tabs
+// Tab Switching
 window.switchTab = function(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
@@ -43,7 +41,7 @@ window.switchTab = function(tabName) {
     }
 };
 
-//student registration
+// Student Reg
 const btnStudentReg = document.getElementById('btnStudentReg');
 if(btnStudentReg) {
     btnStudentReg.addEventListener('click', async () => {
@@ -71,7 +69,7 @@ if(btnStudentReg) {
     });
 }
 
-//admin registration
+// Admin Reg
 const btnAdminReg = document.getElementById('btnAdminReg');
 if(btnAdminReg) {
     btnAdminReg.addEventListener('click', async () => {
@@ -90,7 +88,7 @@ if(btnAdminReg) {
     });
 }
 
-//Login
+// Login
 const btnLogin = document.getElementById('btnLogin');
 if(btnLogin) {
     btnLogin.addEventListener('click', async () => {
@@ -104,13 +102,12 @@ if(btnLogin) {
     });
 }
 
-//change of role and tab differentiate
+// Check Role
 async function checkUserRole(uid) {
     const docSnap = await getDoc(doc(db, "users", uid));
     if (docSnap.exists()) {
         const data = docSnap.data();
         
-        //open the panel and make the dashboard visible
         document.getElementById('authSection').style.display = 'none';
         document.getElementById('dashboardView').style.display = 'block';
         const container = document.getElementById('mainAppContainer');
@@ -121,23 +118,18 @@ async function checkUserRole(uid) {
     }
 }
 
-//screen settings
 function setupStudentView(user) {
     document.getElementById('welcomeMsg').innerText = `Hello, ${user.firstName || 'Student'}`;
     if (user.noShowCount && user.noShowCount >= 3) {
-        // İstersen şık bir div ekle, şimdilik alert ile gösterelim
         const warningDiv = document.createElement('div');
         warningDiv.style = "background:#fee2e2; color:#b91c1c; padding:15px; margin-bottom:20px; border-radius:12px; border:1px solid #ef4444; font-weight:bold;";
         warningDiv.innerHTML = `⚠️ ACCOUNT WARNING: You have ${user.noShowCount} 'No-Show' penalties! Please attend your reservations.`;
-        
-        // Dashboard'ın tepesine ekle
         const dashHeader = document.querySelector('.dash-header');
         dashHeader.parentNode.insertBefore(warningDiv, dashHeader.nextSibling);
     }
     const dormInfo = document.getElementById('userDormDisplay');
     if(dormInfo) dormInfo.innerText = `${user.dorm || ''} • Block ${user.block || ''}`;
     
-    // HIDE Admin controls
     const adminControls = document.getElementById('adminPanelControls');
     if(adminControls) adminControls.style.display = 'none';
     
@@ -152,7 +144,6 @@ function setupAdminView(user) {
     const dormInfo = document.getElementById('userDormDisplay');
     if(dormInfo) dormInfo.innerText = `System Administrator`;
     
-    // SHOW Admin controls
     const addBtn = document.getElementById('addMachineBtn');
     if(addBtn) addBtn.style.display = 'inline-block'; 
 
@@ -161,7 +152,8 @@ function setupAdminView(user) {
 
     loadMachines(true);
 }
-// --- GÜNCELLENMİŞ MAKİNE LİSTELEME (Reserved & Start Özellikli) ---
+
+// --- Load Machines (Updated to display Brand/Capacity) ---
 function loadMachines(isAdmin) {
     onSnapshot(collection(db, "machines"), (snapshot) => {
         const grid = document.getElementById('machinesGrid');
@@ -169,17 +161,16 @@ function loadMachines(isAdmin) {
         
         snapshot.forEach(d => {
             const m = d.data();
-            let statusClass = 'st-free'; // Yeşil
+            let statusClass = 'st-free';
             let statusText = 'AVAILABLE';
             
-            // --- DURUM RENKLERİ ---
             if (m.status === 'in_use') {
-                statusClass = 'st-busy'; // Kırmızı
+                statusClass = 'st-busy'; 
                 statusText = 'IN USE';
             } 
             else if (m.status === 'reserved') {
-                statusClass = 'st-busy'; // Sarı yapabilmek için CSS ile oynayabiliriz ama şimdilik st-busy kalsın
-                statusText = '⏳ RESERVED'; // 5 Dakika sayacı işliyor
+                statusClass = 'st-busy'; 
+                statusText = '⏳ RESERVED'; 
             }
             else if (m.status === 'disabled') {
                 statusClass = 'st-busy'; 
@@ -193,7 +184,6 @@ function loadMachines(isAdmin) {
             let statsHTML = "";
 
             if (isAdmin) {
-                // --- ADMIN GÖRÜNÜMÜ ---
                 const deleteBtn = `<button onclick="window.deleteMachine('${d.id}')" style="color:red; float:right; border:none; background:none; cursor:pointer;" title="Delete"><i class="fa-solid fa-trash"></i></button>`;
                 
                 if (m.status === 'disabled') {
@@ -201,13 +191,10 @@ function loadMachines(isAdmin) {
                 } else {
                     actionBtn = `<div style="height:35px;"></div>`; 
                 }
-
                 statsHTML = `${deleteBtn}<div style="font-size:0.8rem; color:#64748b; margin-top:5px; border-top:1px solid #eee; padding-top:5px;">Total Cycles: <b>${usageStats}</b></div>`;
             } 
             else {
-                // --- ÖĞRENCİ GÖRÜNÜMÜ ---
                 if (m.status === 'available') {
-                    // BOŞ: Book ve Report butonları
                     actionBtn = `
                     <div style="display:flex; gap:5px; margin-top:10px;">
                         <button onclick="window.bookMachine('${d.id}')" class="btn-main" style="flex:2; background-color:#2563eb;">Book</button>
@@ -215,12 +202,10 @@ function loadMachines(isAdmin) {
                     </div>`;
                 }
                 else if (m.status === 'reserved' && m.userId === currentUser.uid) {
-                    // REZERVE (Benim): "Start" butonu çıkar!
                     actionBtn = `<button onclick="window.startMachine('${d.id}')" class="btn-main" style="margin-top:10px; background-color:#f59e0b; color:black;">▶ Start Washing</button>
                                  <div style="font-size:0.75rem; color:red; margin-top:5px;">You have 5 mins to start!</div>`;
                 }
                 else if (m.status === 'in_use' && m.userId === currentUser.uid) {
-                    // ÇALIŞIYOR (Benim): "Finish" butonu çıkar
                     actionBtn = `<button onclick="window.finishMachine('${d.id}')" class="btn-main" style="margin-top:10px; background-color:#16a34a;">Finish / Release</button>`;
                 }
                 else if (m.status === 'disabled') {
@@ -231,7 +216,6 @@ function loadMachines(isAdmin) {
                 }
             }
 
-            // KART RENGİ AYARI (Reserved ise Sarımsı)
             let cardStyle = "";
             if(m.status === 'disabled') cardStyle = "opacity:0.8; background:#fef2f2;";
             if(m.status === 'reserved') cardStyle = "border: 2px solid #f59e0b; background:#fffbeb;";
@@ -242,6 +226,9 @@ function loadMachines(isAdmin) {
                     <i class="fa-solid ${m.status==='disabled'?'fa-triangle-exclamation':'fa-soap'}"></i>
                 </div>
                 <h3>${m.name}</h3>
+                <div style="font-size:0.9rem; color:#475569; font-weight:600; margin-bottom:5px;">
+                    ${m.brand || 'Generic'} • ${m.capacity || '-'}kg
+                </div>
                 <p style="color:#64748b;">${m.type}</p>
                 ${isAdmin ? statsHTML : ''}
                 <div class="status-badge ${statusClass}" style="${m.status==='reserved'?'background:#fef3c7; color:#b45309':''}">${statusText}</div>
@@ -252,22 +239,71 @@ function loadMachines(isAdmin) {
     });
 }
 
-//global functions
 window.logout = () => signOut(auth).then(() => location.reload());
-window.addMachine = async () => {
-    const name = prompt("Enter Machine Name:");
-    if(name) await addDoc(collection(db, "machines"), { name, type: 'Washing', status: 'available' });
+
+// =======================================================
+// ⚠️ CHANGED: ADD MACHINE NOW OPENS THE MODAL (NO PROMPTS)
+// =======================================================
+
+// 1. This function is called by the "+ Add" button in HTML
+window.addMachine = function() {
+    // Simply show the hidden div
+    const modal = document.getElementById('addMachineModal');
+    if(modal) modal.style.display = 'flex';
 };
-window.deleteMachine = async (id) => {
-    if(confirm("Are you sure you want to delete this machine?")) await deleteDoc(doc(db, "machines", id));
-};
+
+// 2. Logic to Save Data when "Add Machine" button INSIDE modal is clicked
+const btnSaveMachine = document.getElementById('btnSaveMachine');
+const btnCancelAdd = document.getElementById('btnCancelAdd');
+
+if(btnSaveMachine) {
+    btnSaveMachine.addEventListener('click', async () => {
+        // Get data from the form inputs
+        const nameVal = document.getElementById('newM_Name').value;
+        const brandVal = document.getElementById('newM_Brand').value;
+        const typeVal = document.getElementById('newM_Type').value;
+        const capVal = document.getElementById('newM_Cap').value;
+
+        if (!nameVal || !brandVal || !capVal) {
+            alert("Please fill in all fields!");
+            return;
+        }
+
+        try {
+            await addDoc(collection(db, "machines"), { 
+                name: nameVal, 
+                brand: brandVal,
+                type: typeVal,
+                capacity: capVal,
+                status: 'available',
+                usageCount: 0
+            });
+            
+            // Close Modal & Clear Inputs
+            document.getElementById('addMachineModal').style.display = 'none';
+            document.getElementById('newM_Name').value = "";
+            document.getElementById('newM_Brand').value = "";
+            document.getElementById('newM_Cap').value = "";
+            
+        } catch(error) {
+            console.error("Error adding machine: ", error);
+            alert("Error: " + error.message);
+        }
+    });
+}
+
+// 3. Logic to Close Modal on Cancel
+if(btnCancelAdd) {
+    btnCancelAdd.addEventListener('click', () => {
+        document.getElementById('addMachineModal').style.display = 'none';
+    });
+}
 
 
 // ==========================================
-// ⚠️ ADMIN ADVANCED FEATURES (Initialize, Reset, Backup)
+// ⚠️ ADMIN ADVANCED FEATURES
 // ==========================================
 
-// 1. INITIALIZE (Add 10 Machines Automatically)
 window.initializeDatabase = async function() {
     const confirmInit = confirm("WARNING: This will automatically add 10 test machines to the database. Do you want to proceed?");
     if (!confirmInit) return;
@@ -276,19 +312,21 @@ window.initializeDatabase = async function() {
         const batch = writeBatch(db); 
 
         for (let i = 1; i <= 5; i++) {
-            // 5 Washing Machines
             const washerRef = doc(collection(db, "machines"));
             batch.set(washerRef, {
                 type: "Washer",
                 name: `Washer #${i}`,
+                brand: "Samsung", 
+                capacity: "9",
                 status: "available",
             });
 
-            // 5 Dryers
             const dryerRef = doc(collection(db, "machines"));
             batch.set(dryerRef, {
                 type: "Dryer",
                 name: `Dryer #${i}`,
+                brand: "LG",
+                capacity: "8",
                 status: "available",
             });
         }
@@ -301,7 +339,6 @@ window.initializeDatabase = async function() {
     }
 }
 
-// 2. RESET ALL (Set all to Available)
 window.resetSystem = async function() {
     const confirmReset = confirm("WARNING: All machines will be reset to 'Available' status. Are you sure?");
     if (!confirmReset) return;
@@ -326,7 +363,6 @@ window.resetSystem = async function() {
     }
 }
 
-// 3. BACKUP (Download JSON)
 window.backupData = async function() {
     try {
         const querySnapshot = await getDocs(collection(db, "machines"));
@@ -354,7 +390,6 @@ window.backupData = async function() {
     }
 }
 
-// 4. BIND BUTTONS
 const btnInit = document.getElementById('btnInitialize');
 if(btnInit) btnInit.addEventListener('click', window.initializeDatabase);
 
@@ -364,26 +399,19 @@ if(btnReset) btnReset.addEventListener('click', window.resetSystem);
 const btnBackup = document.getElementById('btnBackup');
 if(btnBackup) btnBackup.addEventListener('click', window.backupData);
 
-// ... (Üstteki kodlar bitiyor) ...
-
-// YENİ: NO-SHOW BUTONUNU BAĞLA
 const btnNoShow = document.getElementById('btnNoShow');
 if(btnNoShow) btnNoShow.addEventListener('click', window.checkNoShows);
 
 
 // ==========================================
-// ⚠️ BOOKING SYSTEM LOGIC (Rezervasyon Sistemi)
+// ⚠️ BOOKING SYSTEM LOGIC
 // ==========================================
 
-// 1. MAKİNEYİ KİRALA (BOOK)
-// GÜNCELLENMİŞ BOOK MACHINE (Sayaçlı Versiyon)
-// 1. GÜNCELLENMİŞ BOOK (Sadece Rezerve Eder)
 window.bookMachine = async function(machineId) {
     const user = auth.currentUser;
     if (!user) { alert("Please login first!"); return; }
 
     try {
-        // Önce kullanıcının ceza puanına bakalım (Opsiyonel: 3 ceza varsa engelleyebilirsin bile!)
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists() && userSnap.data().noShowCount >= 3) {
             alert("⚠️ WARNING: You have 3 or more 'No-Show' penalties. Please be careful!");
@@ -391,12 +419,11 @@ window.bookMachine = async function(machineId) {
 
         const machineRef = doc(db, "machines", machineId);
         
-        // Durumu 'reserved' yap
         await updateDoc(machineRef, {
             status: 'reserved',
             userId: user.uid,
             userEmail: user.email, 
-            startTime: new Date().toISOString() // Sayaç bu saatten başlayacak
+            startTime: new Date().toISOString()
         });
         
         alert("✅ Reserved! You have 5 MINUTES to click 'Start Washing', otherwise it will be cancelled.");
@@ -406,7 +433,6 @@ window.bookMachine = async function(machineId) {
     }
 }
 
-// 2. YENİ: START MACHINE (Yıkamayı Başlatır)
 window.startMachine = async function(machineId) {
     try {
         const machineRef = doc(db, "machines", machineId);
@@ -414,7 +440,6 @@ window.startMachine = async function(machineId) {
         const currentData = docSnap.data();
         const currentCount = currentData.usageCount || 0;
 
-        // Durumu 'in_use' yap ve sayacı artır
         await updateDoc(machineRef, {
             status: 'in_use',
             usageCount: currentCount + 1 
@@ -427,7 +452,6 @@ window.startMachine = async function(machineId) {
     }
 }
 
-// 2. MAKİNEYİ BIRAK (FINISH)
 window.finishMachine = async function(machineId) {
     const confirmFinish = confirm("Have you finished your laundry? The machine will be available for others.");
     if (!confirmFinish) return;
@@ -435,7 +459,6 @@ window.finishMachine = async function(machineId) {
     try {
         const machineRef = doc(db, "machines", machineId);
 
-        // Veritabanını güncelle: Tekrar boş yap, kullanıcıyı sil
         await updateDoc(machineRef, {
             status: 'available',
             userId: null,
@@ -450,11 +473,6 @@ window.finishMachine = async function(machineId) {
     }
 }
 
-// ==========================================
-// ⚠️ REPORTING & MAINTENANCE (Arıza Bildirimi)
-// ==========================================
-
-// 1. ÖĞRENCİ: MAKİNEYİ BOZUK OLARAK İŞARETLE (REPORT)
 window.reportMachine = async function(machineId) {
     const confirmReport = confirm("Are you sure you want to report an issue with this machine? It will be marked as 'Maintenance'.");
     if (!confirmReport) return;
@@ -463,8 +481,8 @@ window.reportMachine = async function(machineId) {
         const machineRef = doc(db, "machines", machineId);
         
         await updateDoc(machineRef, {
-            status: 'disabled',       // Durumu 'disabled' yap
-            userId: null,             // Kimse kullanamasın
+            status: 'disabled',       
+            userId: null,            
             startTime: null
         });
         
@@ -475,7 +493,6 @@ window.reportMachine = async function(machineId) {
     }
 }
 
-// 2. ADMIN: MAKİNEYİ TAMİR ET / TEKRAR AÇ (FIX)
 window.fixMachine = async function(machineId) {
     const confirmFix = confirm("Has the issue been resolved? Machine will be marked as 'Available'.");
     if (!confirmFix) return;
@@ -484,7 +501,7 @@ window.fixMachine = async function(machineId) {
         const machineRef = doc(db, "machines", machineId);
         
         await updateDoc(machineRef, {
-            status: 'available'       // Tekrar kullanıma aç
+            status: 'available'
         });
         
         alert("✅ Machine is now fixed and available for students.");
@@ -494,8 +511,6 @@ window.fixMachine = async function(machineId) {
     }
 }
 
-
-// ⚠️ ADMIN: NO-SHOW CHECKER (5 Dakika Kuralı & Ceza)
 window.checkNoShows = async function() {
     const confirmCheck = confirm("System will check for expired reservations (>5 mins) and penalize users. Proceed?");
     if (!confirmCheck) return;
@@ -509,21 +524,17 @@ window.checkNoShows = async function() {
         for (const docSnapshot of querySnapshot.docs) {
             const m = docSnapshot.data();
             
-            // Sadece 'reserved' olanlara bak
             if (m.status === 'reserved' && m.startTime) {
                 const reservedTime = new Date(m.startTime);
-                const diffMinutes = (now - reservedTime) / 1000 / 60; // Dakika farkı
+                const diffMinutes = (now - reservedTime) / 1000 / 60; 
 
-                // Eğer 5 dakikayı geçtiyse
                 if (diffMinutes > 5) {
-                    // 1. Makineyi Boşa Çıkar
                     batch.update(docSnapshot.ref, {
                         status: 'available',
                         userId: null,
                         startTime: null
                     });
 
-                    // 2. Kullanıcıya Ceza Yaz (No-Show Count Artır)
                     if (m.userId) {
                         const userRef = doc(db, "users", m.userId);
                         const userSnap = await getDoc(userRef);
@@ -540,7 +551,7 @@ window.checkNoShows = async function() {
         if (expiredCount > 0) {
             await batch.commit();
             alert(`✅ Done! ${expiredCount} expired reservations cancelled and users penalized.`);
-            loadMachines(true); // Admin listesini yenile
+            loadMachines(true); 
         } else {
             alert("No expired reservations found.");
         }
@@ -550,3 +561,7 @@ window.checkNoShows = async function() {
         alert("Error: " + error.message);
     }
 }
+
+window.deleteMachine = async (id) => {
+    if(confirm("Are you sure you want to delete this machine?")) await deleteDoc(doc(db, "machines", id));
+};
