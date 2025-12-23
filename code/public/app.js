@@ -3,7 +3,7 @@
  */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, deleteDoc, writeBatch, getDocs, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 
@@ -22,18 +22,40 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// 🆕 CONSTANT: Time Slots
+// 🆕 CONSTANT: Time Slots (Updated to 1-Hour Intervals)
 const TIME_SLOTS = [
-    "08:00 - 10:00",
-    "10:00 - 12:00",
-    "12:00 - 14:00",
-    "14:00 - 16:00",
-    "16:00 - 18:00",
-    "18:00 - 20:00",
-    "20:00 - 22:00"
+    "08:00 - 09:00",
+    "09:00 - 10:00",
+    "10:00 - 11:00",
+    "11:00 - 12:00",
+    "12:00 - 13:00",
+    "13:00 - 14:00",
+    "14:00 - 15:00",
+    "15:00 - 16:00",
+    "16:00 - 17:00",
+    "17:00 - 18:00",
+    "18:00 - 19:00",
+    "19:00 - 20:00",
+    "20:00 - 21:00",
+    "21:00 - 22:00",
+    "22:00 - 23:00",
+    "23:00 - 24:00",
 ];
 
 console.log("WashMate loaded succesfully!"); 
+// ==========================================
+// 🔄 AUTH LISTENER (Keeps you logged in!)
+// ==========================================
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        console.log("User detected:", user.email);
+        // Automatically load dashboard
+        checkUserRole(user.uid);
+    } else {
+        console.log("No user signed in.");
+        switchTab('login');
+    }
+});
 
 // Tab Switching
 window.switchTab = function(tabName) {
@@ -242,9 +264,46 @@ function loadPendingUsers() {
     });
 }
 
+// ==========================================
+// ⚠️ UPDATED: APPROVE USER WITH EMAIL
+// ==========================================
 window.approveUser = async (uid) => {
-    if(!confirm("Approve this student?")) return;
-    try { await updateDoc(doc(db, "users", uid), { status: 'approved' }); } catch(e) { alert("Error: " + e.message); }
+    if(!confirm("Approve this student and send email?")) return;
+    
+    try {
+        // 1. Get User Data (We need their Email & Name)
+        const userRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (!userSnap.exists()) {
+            alert("Error: User not found!");
+            return;
+        }
+        
+        const userData = userSnap.data();
+
+        // 2. Prepare Email Parameters
+        const templateParams = {
+            to_email: userData.email,
+            name: userData.firstName || "Student",
+            message: "Your account has been approved! You can now login to WashMate."
+        };
+
+        // 3. Send Email (Replace 'YOUR_NEW_TEMPLATE_ID' below!)
+        // Note: We use the same Service ID ('service_71yqlq4') but the NEW Template ID
+        await emailjs.send('service_71yqlq4', 'template_svwh05l', templateParams);
+        console.log(`✅ Approval email sent to ${userData.email}`);
+
+        // 4. Update Database Status
+        await updateDoc(userRef, { status: 'approved' });
+        
+        // Alert is optional since the list updates automatically, but good for confirmation
+        alert(`✅ User Approved & Email Sent to ${userData.email}`);
+
+    } catch(e) { 
+        console.error("Approval Error:", e);
+        alert("Error: " + e.message); 
+    }
 };
 
 window.rejectUser = async (uid) => {
@@ -754,11 +813,17 @@ async function sendEmailNotification(userEmail, machineName, type) {
         console.error("Failed to send email:", error);
     }
 }
+
+
 // ==========================================
-// ⏱️ AUTOMATIC FINISH SYSTEM ("Heartbeat")
+// ⏱️ AUTOMATIC BACKGROUND CHECKS ("Heartbeat")
 // ==========================================
-// This runs every 60 seconds to check for finished machines
-setInterval(checkExpiredMachines, 60000); // 60000 ms = 1 minute
+// Runs every 60 seconds
+setInterval(() => {
+    checkExpiredMachines(); // Existing: Checks for finish time
+    checkNoShows();         // 🆕 NEW: Checks for late students
+}, 60000);
+
 
 async function checkExpiredMachines() {
     console.log("💜 Heartbeat: Checking for finished machines...");
@@ -801,3 +866,66 @@ async function checkExpiredMachines() {
         console.error("Auto-Check Error:", error);
     }
 }
+
+
+// 🆕 5-MINUTE NO-SHOW RULE
+async function checkNoShows() {
+    console.log("🕵️ Checking for No-Shows...");
+    
+    try {
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0]; // Today's date (YYYY-MM-DD)
+        
+        // 1. Get ALL appointments for TODAY
+        const q = query(collection(db, "appointments"), where("date", "==", dateStr));
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) return;
+
+        snapshot.forEach(async (appSnap) => {
+            const booking = appSnap.data();
+            
+            // 2. Parse the Slot Start Time (e.g., "10:00 - 12:00")
+            const slotStartString = booking.slot.split(' - ')[0]; // Gets "10:00"
+            const [hours, minutes] = slotStartString.split(':');
+            
+            // Create a Date object for the Booking Start Time
+            const bookingTime = new Date();
+            bookingTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            
+            // Calculate how many minutes late they are
+            const diffMinutes = (now - bookingTime) / 60000; // milliseconds to minutes
+
+            // ⚠️ RULE: If they are more than 5 mins late (and less than 120 mins)
+            if (diffMinutes > 5 && diffMinutes < 120) {
+                
+                // 3. Check if Machine is STILL Available (Not Started)
+                const mRef = doc(db, "machines", booking.machineId);
+                const mSnap = await getDoc(mRef);
+                
+                if (mSnap.exists() && mSnap.data().status === 'available') {
+                    console.log(`⚠️ No-Show detected for ${booking.userEmail}. Deleting reservation.`);
+                    
+                    // A. Delete the Appointment
+                    await deleteDoc(appSnap.ref);
+                    
+                    // B. Penalize the User (Increase No-Show Count)
+                    const uRef = doc(db, "users", booking.userId);
+                    const uSnap = await getDoc(uRef);
+                    
+                    if(uSnap.exists()) {
+                        const currentCount = uSnap.data().noShowCount || 0;
+                        await updateDoc(uRef, { noShowCount: currentCount + 1 });
+                    }
+
+                    // C. Optional: Send "Cancelled" Email
+                    // You can use your sendEmailNotification helper here if you want!
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error("No-Show Check Error:", error);
+    }
+}
+
