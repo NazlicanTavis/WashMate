@@ -1,15 +1,15 @@
 /**
- * WASHMATE APP - V2 (With Approval System)
+ * WASHMATE APP - V3 (Approval System + Time Slot Booking)
  * -----------------------------
  * Features:
  * 1. Admin Panel with "Add Machine" Modal Form.
  * 2. User Approval System (Approve/Reject).
- * 3. Student Booking & Reporting.
+ * 3. Time Slot Booking (Today/Tomorrow).
+ * 4. My Reservations List.
  */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-// UPDATED IMPORTS: Added 'query' and 'where'
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, deleteDoc, writeBatch, getDocs, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 
@@ -27,6 +27,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// 🆕 CONSTANT: Time Slots
+const TIME_SLOTS = [
+    "08:00 - 10:00",
+    "10:00 - 12:00",
+    "12:00 - 14:00",
+    "14:00 - 16:00",
+    "16:00 - 18:00",
+    "18:00 - 20:00",
+    "20:00 - 22:00"
+];
 
 console.log("WashMate loaded succesfully!"); 
 
@@ -52,7 +63,7 @@ window.switchTab = function(tabName) {
 };
 
 // ==========================================
-// ⚠️ UPDATED: STUDENT REGISTRATION (PENDING STATUS)
+// STUDENT REGISTRATION (PENDING STATUS)
 // ==========================================
 const btnStudentReg = document.getElementById('btnStudentReg');
 if(btnStudentReg) {
@@ -72,14 +83,7 @@ if(btnStudentReg) {
             
             // Set status to 'pending' by default
             await setDoc(doc(db, "users", cred.user.uid), {
-                firstName, 
-                lastName, 
-                studentID, 
-                dorm, 
-                block, 
-                email, 
-                role: "student",
-                status: "pending" // <--- NEW FIELD
+                firstName, lastName, studentID, dorm, block, email, role: "student", status: "pending"
             });
 
             alert("✅ Registration Successful!\n\nYour account is currently PENDING approval from the Administrator. You cannot login until approved.");
@@ -103,13 +107,7 @@ if(btnAdminReg) {
 
         try {
             const cred = await createUserWithEmailAndPassword(auth, email, pass);
-            // Admins are auto-approved for now, or you can make them pending too
-            await setDoc(doc(db, "users", cred.user.uid), { 
-                fullName, 
-                email, 
-                role: "admin", 
-                status: "approved" 
-            });
+            await setDoc(doc(db, "users", cred.user.uid), { fullName, email, role: "admin", status: "approved" });
             alert("Admin Registration Successful!");
             window.location.reload();
         } catch (e) { alert("Error: " + e.message); }
@@ -131,7 +129,7 @@ if(btnLogin) {
 }
 
 // ==========================================
-// ⚠️ UPDATED: LOGIN CHECK (BLOCK PENDING USERS)
+// LOGIN CHECK (BLOCK PENDING USERS)
 // ==========================================
 async function checkUserRole(uid) {
     const docSnap = await getDoc(doc(db, "users", uid));
@@ -178,16 +176,17 @@ function setupStudentView(user) {
     const dormInfo = document.getElementById('userDormDisplay');
     if(dormInfo) dormInfo.innerText = `${user.dorm || ''} • Block ${user.block || ''}`;
     
-    const adminControls = document.getElementById('adminPanelControls');
-    if(adminControls) adminControls.style.display = 'none';
-    
-    // Hide Admin Approval Section for Students
-    const approvalSection = document.getElementById('adminApprovalsSection');
-    if(approvalSection) approvalSection.style.display = 'none';
-    
-    const addBtn = document.getElementById('addMachineBtn');
-    if(addBtn) addBtn.style.display = 'none';
+    // Hide Admin Controls
+    document.getElementById('adminPanelControls').style.display = 'none';
+    document.getElementById('adminApprovalsSection').style.display = 'none';
+    document.getElementById('addMachineBtn').style.display = 'none';
 
+    // 🆕 Show Reservations for Student
+    const myResSection = document.getElementById('myReservationsSection');
+    if(myResSection) myResSection.style.display = 'block';
+    
+    // 🆕 Load Data
+    loadMyReservations();
     loadMachines(false);
 }
 
@@ -196,34 +195,32 @@ function setupAdminView(user) {
     const dormInfo = document.getElementById('userDormDisplay');
     if(dormInfo) dormInfo.innerText = `System Administrator`;
     
-    const addBtn = document.getElementById('addMachineBtn');
-    if(addBtn) addBtn.style.display = 'inline-block'; 
+    // Show Admin Controls
+    document.getElementById('addMachineBtn').style.display = 'inline-block'; 
+    document.getElementById('adminPanelControls').style.display = 'block';
+    document.getElementById('adminApprovalsSection').style.display = 'block';
 
-    const adminControls = document.getElementById('adminPanelControls');
-    if(adminControls) adminControls.style.display = 'block';
-
-    // Show Approval Section
-    const approvalSection = document.getElementById('adminApprovalsSection');
-    if(approvalSection) approvalSection.style.display = 'block';
+    // Hide Student Reservations
+    const myResSection = document.getElementById('myReservationsSection');
+    if(myResSection) myResSection.style.display = 'none';
 
     // Load Data
     loadMachines(true);
-    loadPendingUsers(); // <--- NEW FUNCTION CALL
+    loadPendingUsers(); 
 }
 
 // ==========================================
-// ⚠️ NEW: ADMIN APPROVAL SYSTEM LOGIC
+// ADMIN APPROVAL SYSTEM LOGIC
 // ==========================================
 
 function loadPendingUsers() {
-    // Listen specifically for users where status == 'pending'
     const q = query(collection(db, "users"), where("status", "==", "pending"));
 
     onSnapshot(q, (snapshot) => {
         const grid = document.getElementById('pendingUsersGrid');
         if(!grid) return;
         
-        grid.innerHTML = ""; // Clear current list
+        grid.innerHTML = ""; 
 
         if (snapshot.empty) {
             grid.innerHTML = `<p style="color:#64748b; font-style:italic;">No pending approvals.</p>`;
@@ -234,7 +231,6 @@ function loadPendingUsers() {
             const u = docSnap.data();
             const uid = docSnap.id;
 
-            // Create a nice card for the pending user
             const card = document.createElement('div');
             card.style = "background:white; border:1px solid #e2e8f0; padding:15px; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.05);";
             
@@ -252,31 +248,177 @@ function loadPendingUsers() {
     });
 }
 
-// Global functions for the buttons
 window.approveUser = async (uid) => {
     if(!confirm("Approve this student?")) return;
-    try {
-        await updateDoc(doc(db, "users", uid), { status: 'approved' });
-        // Alert is optional, the UI will update automatically due to onSnapshot
-    } catch(e) {
-        alert("Error approving: " + e.message);
-    }
+    try { await updateDoc(doc(db, "users", uid), { status: 'approved' }); } catch(e) { alert("Error: " + e.message); }
 };
 
 window.rejectUser = async (uid) => {
-    if(!confirm("Reject (Delete) this registration request?")) return;
-    try {
-        // We simply delete the user document. 
-        // Note: The Auth user still exists in Firebase Auth but they can't log in because checkUserRole fails.
-        // For a full clean up, you'd need Cloud Functions, but this is sufficient for this scope.
-        await deleteDoc(doc(db, "users", uid));
-    } catch(e) {
-        alert("Error rejecting: " + e.message);
-    }
+    if(!confirm("Reject this registration request?")) return;
+    try { await deleteDoc(doc(db, "users", uid)); } catch(e) { alert("Error: " + e.message); }
 };
 
 
-// --- Load Machines ---
+// ==========================================
+// 🆕 TIME SLOT BOOKING LOGIC
+// ==========================================
+
+// 1. Open Booking Modal
+window.openBookingModal = async function(machineId, machineName) {
+    const modal = document.getElementById('bookingModal');
+    if(modal) {
+        modal.style.display = 'flex';
+        document.getElementById('bookingTitle').innerText = `Book ${machineName}`;
+        document.getElementById('selectedMachineId').value = machineId;
+        // Default select 'Today'
+        selectDateTab('today');
+    }
+}
+
+window.closeBookingModal = function() {
+    const modal = document.getElementById('bookingModal');
+    if(modal) modal.style.display = 'none';
+}
+
+// 2. Date Tabs Logic
+const btnToday = document.getElementById('btnDateToday');
+const btnTom = document.getElementById('btnDateTom');
+
+if(btnToday) btnToday.addEventListener('click', () => selectDateTab('today'));
+if(btnTom) btnTom.addEventListener('click', () => selectDateTab('tomorrow'));
+
+function selectDateTab(day) {
+    document.getElementById('selectedDate').value = day;
+    
+    if(day === 'today') {
+        btnToday.classList.add('active'); btnToday.style.background='white'; btnToday.style.color='#2563eb';
+        btnTom.classList.remove('active'); btnTom.style.background='transparent'; btnTom.style.color='#64748b';
+    } else {
+        btnTom.classList.add('active'); btnTom.style.background='white'; btnTom.style.color='#2563eb';
+        btnToday.classList.remove('active'); btnToday.style.background='transparent'; btnToday.style.color='#64748b';
+    }
+    
+    renderSlots();
+}
+
+// 3. Render Slots (Check availability)
+async function renderSlots() {
+    const machineId = document.getElementById('selectedMachineId').value;
+    const day = document.getElementById('selectedDate').value;
+    const grid = document.getElementById('slotsGrid');
+    grid.innerHTML = "<p>Loading slots...</p>";
+
+    // Calc Date String
+    const dateObj = new Date();
+    if(day === 'tomorrow') dateObj.setDate(dateObj.getDate() + 1);
+    const dateStr = dateObj.toISOString().split('T')[0];
+
+    // Check Firebase for bookings
+    const q = query(
+        collection(db, "appointments"), 
+        where("machineId", "==", machineId),
+        where("date", "==", dateStr)
+    );
+    
+    const snapshot = await getDocs(q);
+    const bookedSlots = [];
+    snapshot.forEach(doc => bookedSlots.push(doc.data().slot));
+
+    grid.innerHTML = ""; 
+    const currentHour = new Date().getHours();
+
+    TIME_SLOTS.forEach(slot => {
+        const startHour = parseInt(slot.split(':')[0]);
+        const btn = document.createElement('button');
+        btn.className = "slot-btn";
+        btn.innerText = slot;
+        // Basic CSS for buttons dynamically if not in CSS file
+        btn.style = "padding:10px; border:1px solid #ddd; border-radius:8px; cursor:pointer;";
+
+        let isPast = (day === 'today' && startHour <= currentHour);
+        let isBooked = bookedSlots.includes(slot);
+
+        if (isBooked) {
+            btn.disabled = true;
+            btn.style.background = "#fee2e2";
+            btn.style.color = "#b91c1c";
+            btn.innerText += " (Busy)";
+        } else if (isPast) {
+            btn.disabled = true;
+            btn.style.background = "#f1f5f9";
+            btn.style.color = "#94a3b8";
+            btn.innerText += " (Past)";
+        } else {
+            btn.style.background = "white";
+            btn.onclick = () => confirmBooking(slot, dateStr);
+        }
+        grid.appendChild(btn);
+    });
+}
+
+// 4. Save Booking
+async function confirmBooking(slot, dateStr) {
+    if(!confirm(`Confirm booking for ${dateStr} at ${slot}?`)) return;
+
+    const machineId = document.getElementById('selectedMachineId').value;
+    const user = auth.currentUser;
+
+    try {
+        await addDoc(collection(db, "appointments"), {
+            machineId: machineId,
+            userId: user.uid,
+            userEmail: user.email,
+            date: dateStr,
+            slot: slot,
+            createdAt: new Date().toISOString()
+        });
+        
+        alert("✅ Booking Confirmed!");
+        closeBookingModal();
+        loadMyReservations();
+    } catch(e) {
+        console.error(e);
+        alert("Booking failed: " + e.message);
+    }
+}
+
+// 5. My Reservations List
+function loadMyReservations() {
+    const user = auth.currentUser;
+    if(!user) return;
+
+    const q = query(collection(db, "appointments"), where("userId", "==", user.uid));
+    
+    onSnapshot(q, (snapshot) => {
+        const list = document.getElementById('myResList');
+        if(!list) return;
+        list.innerHTML = "";
+
+        if(snapshot.empty) {
+            list.innerHTML = "<p style='color:#94a3b8; font-size:0.9rem;'>No active reservations.</p>";
+            return;
+        }
+
+        snapshot.forEach(d => {
+            const r = d.data();
+            const card = document.createElement('div');
+            card.style = "background:#f8fafc; padding:10px 15px; border-radius:10px; border:1px solid #e2e8f0; font-size:0.9rem; display:flex; align-items:center; gap:10px; margin-bottom:10px;";
+            card.innerHTML = `
+                <div style="color:#2563eb; font-weight:bold;">${r.date}</div>
+                <div style="font-weight:600;">${r.slot}</div>
+                <button onclick="deleteReservation('${d.id}')" style="margin-left:auto; color:red; border:none; background:none; cursor:pointer;" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+            `;
+            list.appendChild(card);
+        });
+    });
+}
+
+window.deleteReservation = async (id) => {
+    if(confirm("Cancel this reservation?")) await deleteDoc(doc(db, "appointments", id));
+}
+
+
+// --- Load Machines (Updated for Time Slots) ---
 function loadMachines(isAdmin) {
     onSnapshot(collection(db, "machines"), (snapshot) => {
         const grid = document.getElementById('machinesGrid');
@@ -284,6 +426,9 @@ function loadMachines(isAdmin) {
         
         snapshot.forEach(d => {
             const m = d.data();
+            
+            // Simplified status logic for Time Slot version
+            // "In Use" is set manually by students when they arrive
             let statusClass = 'st-free';
             let statusText = 'AVAILABLE';
             
@@ -291,16 +436,11 @@ function loadMachines(isAdmin) {
                 statusClass = 'st-busy'; 
                 statusText = 'IN USE';
             } 
-            else if (m.status === 'reserved') {
-                statusClass = 'st-busy'; 
-                statusText = '⏳ RESERVED'; 
-            }
             else if (m.status === 'disabled') {
                 statusClass = 'st-busy'; 
                 statusText = '⚠️ MAINTENANCE';
             }
 
-            const currentUser = auth.currentUser;
             const usageStats = m.usageCount || 0; 
 
             let actionBtn = "";
@@ -317,35 +457,35 @@ function loadMachines(isAdmin) {
                 statsHTML = `${deleteBtn}<div style="font-size:0.8rem; color:#64748b; margin-top:5px; border-top:1px solid #eee; padding-top:5px;">Total Cycles: <b>${usageStats}</b></div>`;
             } 
             else {
-                if (m.status === 'available') {
-                    actionBtn = `
-                    <div style="display:flex; gap:5px; margin-top:10px;">
-                        <button onclick="window.bookMachine('${d.id}')" class="btn-main" style="flex:2; background-color:#2563eb;">Book</button>
-                        <button onclick="window.reportMachine('${d.id}')" class="btn-main" style="flex:1; background-color:#64748b;" title="Report"><i class="fa-solid fa-triangle-exclamation"></i></button>
-                    </div>`;
-                }
-                else if (m.status === 'reserved' && m.userId === currentUser.uid) {
-                    actionBtn = `<button onclick="window.startMachine('${d.id}')" class="btn-main" style="margin-top:10px; background-color:#f59e0b; color:black;">▶ Start Washing</button>
-                                 <div style="font-size:0.75rem; color:red; margin-top:5px;">You have 5 mins to start!</div>`;
-                }
-                else if (m.status === 'in_use' && m.userId === currentUser.uid) {
-                    actionBtn = `<button onclick="window.finishMachine('${d.id}')" class="btn-main" style="margin-top:10px; background-color:#16a34a;">Finish / Release</button>`;
-                }
-                else if (m.status === 'disabled') {
+                // STUDENT VIEW
+                if (m.status === 'disabled') {
                     actionBtn = `<div style="margin-top:10px; font-size:0.8rem; color:#ef4444; font-weight:bold;">OUT OF ORDER</div>`;
+                } 
+                else if (m.status === 'in_use') {
+                    // If in use, only show "Finish" if the user started it? 
+                    // Or keep it simple: Anyone can finish if they see it's done? 
+                    // Let's assume generic "Finish" for now or just show status.
+                    actionBtn = `<button onclick="window.finishMachine('${d.id}')" class="btn-main" style="margin-top:10px; background-color:#16a34a;">Finish / Free Up</button>`;
                 }
                 else {
-                    actionBtn = `<div style="margin-top:10px; font-size:0.8rem; color:#94a3b8;">In use/Reserved by others</div>`;
+                    // AVAILABLE -> Show "Book Slot" OR "Start Now"
+                    actionBtn = `
+                    <div style="display:flex; flex-direction:column; gap:5px; margin-top:10px;">
+                        <button onclick="window.openBookingModal('${d.id}', '${m.name}')" class="btn-main" style="background-color:#2563eb;">📅 Book Future Slot</button>
+                        <div style="display:flex; gap:5px;">
+                            <button onclick="window.startMachine('${d.id}')" class="btn-main" style="flex:1; background-color:#f59e0b; color:black;">▶ Start Now</button>
+                            <button onclick="window.reportMachine('${d.id}')" class="btn-main" style="flex:0.5; background-color:#64748b;" title="Report"><i class="fa-solid fa-triangle-exclamation"></i></button>
+                        </div>
+                    </div>`;
                 }
             }
 
             let cardStyle = "";
             if(m.status === 'disabled') cardStyle = "opacity:0.8; background:#fef2f2;";
-            if(m.status === 'reserved') cardStyle = "border: 2px solid #f59e0b; background:#fffbeb;";
 
             grid.innerHTML += `
             <div class="machine-card" style="${cardStyle}">
-                <div style="font-size:2rem; color:${m.status==='disabled'?'#ef4444':(m.status==='reserved'?'#f59e0b':'#2563eb')}; margin-bottom:10px;">
+                <div style="font-size:2rem; color:${m.status==='disabled'?'#ef4444':(m.status==='in_use'?'#dc2626':'#2563eb')}; margin-bottom:10px;">
                     <i class="fa-solid ${m.status==='disabled'?'fa-triangle-exclamation':'fa-soap'}"></i>
                 </div>
                 <h3>${m.name}</h3>
@@ -354,7 +494,7 @@ function loadMachines(isAdmin) {
                 </div>
                 <p style="color:#64748b;">${m.type}</p>
                 ${isAdmin ? statsHTML : ''}
-                <div class="status-badge ${statusClass}" style="${m.status==='reserved'?'background:#fef3c7; color:#b45309':''}">${statusText}</div>
+                <div class="status-badge ${statusClass}">${statusText}</div>
                 ${!isAdmin ? actionBtn : ''}
                 ${isAdmin && m.status === 'disabled' ? actionBtn : ''}
             </div>`;
@@ -470,41 +610,27 @@ const btnReset = document.getElementById('btnReset');
 if(btnReset) btnReset.addEventListener('click', window.resetSystem);
 const btnBackup = document.getElementById('btnBackup');
 if(btnBackup) btnBackup.addEventListener('click', window.backupData);
-const btnNoShow = document.getElementById('btnNoShow');
-if(btnNoShow) btnNoShow.addEventListener('click', window.checkNoShows);
+// Removed Check No Shows button listener since we removed the logic
 
 // ==========================================
-// BOOKING & REPORTING LOGIC
+// START / FINISH / REPORT LOGIC (UPDATED)
 // ==========================================
 
-window.bookMachine = async function(machineId) {
-    const user = auth.currentUser;
-    if (!user) { alert("Please login first!"); return; }
-    try {
-        const userSnap = await getDoc(doc(db, "users", user.uid));
-        if (userSnap.exists() && userSnap.data().noShowCount >= 3) {
-            alert("⚠️ WARNING: You have 3 or more 'No-Show' penalties.");
-        }
-        await updateDoc(doc(db, "machines", machineId), {
-            status: 'reserved', userId: user.uid, userEmail: user.email, startTime: new Date().toISOString()
-        });
-        alert("✅ Reserved! You have 5 MINUTES to start.");
-    } catch (error) { console.error("Booking Error:", error); alert("Error: " + error.message); }
-}
+// NOTE: bookMachine is removed. We use openBookingModal instead.
 
 window.startMachine = async function(machineId) {
     try {
         const machineRef = doc(db, "machines", machineId);
         const docSnap = await getDoc(machineRef);
         await updateDoc(machineRef, { status: 'in_use', usageCount: (docSnap.data().usageCount || 0) + 1 });
-        alert("✅ Machine Started!");
+        alert("✅ Machine Started! Status set to 'In Use'.");
     } catch (error) { console.error("Start Error:", error); alert("Error: " + error.message); }
 }
 
 window.finishMachine = async function(machineId) {
-    if (!confirm("Finish laundry?")) return;
+    if (!confirm("Finish laundry and mark available?")) return;
     try {
-        await updateDoc(doc(db, "machines", machineId), { status: 'available', userId: null, userEmail: null, startTime: null });
+        await updateDoc(doc(db, "machines", machineId), { status: 'available', userId: null, startTime: null });
         alert("✅ Laundry finished!");
     } catch (error) { console.error("Finish Error:", error); alert("Error: " + error.message); }
 }
@@ -523,32 +649,6 @@ window.fixMachine = async function(machineId) {
         await updateDoc(doc(db, "machines", machineId), { status: 'available' });
         alert("✅ Machine fixed.");
     } catch (error) { console.error("Fix Error:", error); alert("Error: " + error.message); }
-}
-
-window.checkNoShows = async function() {
-    if (!confirm("Check for expired reservations?")) return;
-    try {
-        const querySnapshot = await getDocs(collection(db, "machines"));
-        const batch = writeBatch(db);
-        const now = new Date();
-        let expiredCount = 0;
-        for (const docSnapshot of querySnapshot.docs) {
-            const m = docSnapshot.data();
-            if (m.status === 'reserved' && m.startTime) {
-                if ((now - new Date(m.startTime)) / 1000 / 60 > 5) {
-                    batch.update(docSnapshot.ref, { status: 'available', userId: null, startTime: null });
-                    if (m.userId) {
-                        const userRef = doc(db, "users", m.userId);
-                        const userSnap = await getDoc(userRef);
-                        if (userSnap.exists()) batch.update(userRef, { noShowCount: (userSnap.data().noShowCount || 0) + 1 });
-                    }
-                    expiredCount++;
-                }
-            }
-        }
-        if (expiredCount > 0) { await batch.commit(); alert(`✅ ${expiredCount} expired reservations cancelled.`); loadMachines(true); } 
-        else { alert("No expired reservations found."); }
-    } catch (error) { console.error("No-Show Check Error:", error); alert("Error: " + error.message); }
 }
 
 window.deleteMachine = async (id) => {
