@@ -1,11 +1,5 @@
 /**
- * WASHMATE APP - V3 (Approval System + Time Slot Booking)
- * -----------------------------
- * Features:
- * 1. Admin Panel with "Add Machine" Modal Form.
- * 2. User Approval System (Approve/Reject).
- * 3. Time Slot Booking (Today/Tomorrow).
- * 4. My Reservations List.
+ * WASHMATE APP - V3 (Approval System + Time Slot Booking + Email Notifications)
  */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
@@ -306,54 +300,60 @@ async function renderSlots() {
     const machineId = document.getElementById('selectedMachineId').value;
     const day = document.getElementById('selectedDate').value;
     const grid = document.getElementById('slotsGrid');
-    grid.innerHTML = "<p>Loading slots...</p>";
-
-    // Calc Date String
-    const dateObj = new Date();
-    if(day === 'tomorrow') dateObj.setDate(dateObj.getDate() + 1);
-    const dateStr = dateObj.toISOString().split('T')[0];
-
-    // Check Firebase for bookings
-    const q = query(
-        collection(db, "appointments"), 
-        where("machineId", "==", machineId),
-        where("date", "==", dateStr)
-    );
     
-    const snapshot = await getDocs(q);
-    const bookedSlots = [];
-    snapshot.forEach(doc => bookedSlots.push(doc.data().slot));
+    grid.innerHTML = "<p style='grid-column: span 2; text-align:center; color:#64748b;'>Loading availability...</p>";
 
-    grid.innerHTML = ""; 
-    const currentHour = new Date().getHours();
+    try {
+        // Calc Date String
+        const dateObj = new Date();
+        if(day === 'tomorrow') dateObj.setDate(dateObj.getDate() + 1);
+        const dateStr = dateObj.toISOString().split('T')[0];
 
-    TIME_SLOTS.forEach(slot => {
-        const startHour = parseInt(slot.split(':')[0]);
-        const btn = document.createElement('button');
-        btn.className = "slot-btn";
-        btn.innerText = slot;
-        // Basic CSS for buttons dynamically if not in CSS file
-        btn.style = "padding:10px; border:1px solid #ddd; border-radius:8px; cursor:pointer;";
+        // Check Firebase for bookings
+        const q = query(
+            collection(db, "appointments"), 
+            where("machineId", "==", machineId),
+            where("date", "==", dateStr)
+        );
+        
+        const snapshot = await getDocs(q);
+        const bookedSlots = [];
+        snapshot.forEach(doc => bookedSlots.push(doc.data().slot));
 
-        let isPast = (day === 'today' && startHour <= currentHour);
-        let isBooked = bookedSlots.includes(slot);
+        grid.innerHTML = ""; 
+        const currentHour = new Date().getHours();
 
-        if (isBooked) {
-            btn.disabled = true;
-            btn.style.background = "#fee2e2";
-            btn.style.color = "#b91c1c";
-            btn.innerText += " (Busy)";
-        } else if (isPast) {
-            btn.disabled = true;
-            btn.style.background = "#f1f5f9";
-            btn.style.color = "#94a3b8";
-            btn.innerText += " (Past)";
-        } else {
-            btn.style.background = "white";
-            btn.onclick = () => confirmBooking(slot, dateStr);
-        }
-        grid.appendChild(btn);
-    });
+        TIME_SLOTS.forEach(slot => {
+            const startHour = parseInt(slot.split(':')[0]);
+            const btn = document.createElement('button');
+            btn.className = "slot-btn";
+            btn.innerText = slot;
+            // Basic CSS
+            btn.style = "padding:12px; border:1px solid #cbd5e1; border-radius:10px; cursor:pointer; font-weight:500; transition:0.2s;";
+
+            let isPast = (day === 'today' && startHour <= currentHour);
+            let isBooked = bookedSlots.includes(slot);
+
+            if (isBooked) {
+                btn.disabled = true;
+                btn.style.background = "#fee2e2";
+                btn.style.color = "#b91c1c";
+                btn.innerText += " (Busy)";
+            } else if (isPast) {
+                btn.disabled = true;
+                btn.style.background = "#f1f5f9";
+                btn.style.color = "#94a3b8";
+                btn.innerText += " (Past)";
+            } else {
+                btn.style.background = "white";
+                btn.onclick = () => confirmBooking(slot, dateStr);
+            }
+            grid.appendChild(btn);
+        });
+    } catch(error) {
+        console.error("Slot Error:", error);
+        grid.innerHTML = `<p style="color:red; grid-column:span 2; text-align:center;">Error: ${error.message}</p>`;
+    }
 }
 
 // 4. Save Booking
@@ -620,21 +620,75 @@ if(btnBackup) btnBackup.addEventListener('click', window.backupData);
 
 window.startMachine = async function(machineId) {
     try {
+        const user = auth.currentUser;
+        if (!user) { alert("Please login first!"); return; }
+
         const machineRef = doc(db, "machines", machineId);
         const docSnap = await getDoc(machineRef);
-        await updateDoc(machineRef, { status: 'in_use', usageCount: (docSnap.data().usageCount || 0) + 1 });
-        alert("✅ Machine Started! Status set to 'In Use'.");
-    } catch (error) { console.error("Start Error:", error); alert("Error: " + error.message); }
+        const m = docSnap.data();
+
+        await updateDoc(machineRef, { 
+            status: 'in_use', 
+            usageCount: (m.usageCount || 0) + 1,
+            userId: user.uid,
+            userEmail: user.email,
+            // ⚠️ NEW: We save the Start Time so the auto-checker knows when to finish it
+            startTime: new Date().toISOString() 
+        });
+
+        sendEmailNotification(user.email, m.name, "start"); // Helper function updated below
+
+        alert(`✅ Machine Started! Email sent.`);
+
+    } catch (error) { 
+        console.error("Start Error:", error); 
+        alert("Error: " + error.message); 
+    }
 }
 
 window.finishMachine = async function(machineId) {
     if (!confirm("Finish laundry and mark available?")) return;
-    try {
-        await updateDoc(doc(db, "machines", machineId), { status: 'available', userId: null, startTime: null });
-        alert("✅ Laundry finished!");
-    } catch (error) { console.error("Finish Error:", error); alert("Error: " + error.message); }
-}
 
+    try {
+        // 1. Get machine data BEFORE clearing it (to find the email)
+        const machineRef = doc(db, "machines", machineId);
+        const docSnap = await getDoc(machineRef);
+        
+        if (docSnap.exists()) {
+            const m = docSnap.data();
+            
+            // 2. Send the "Finished" Email
+            // Note: We use the helper function you already created
+            if (m.userEmail) {
+                const templateParams = {
+                    to_email: m.userEmail,
+                    name: "Student",
+                    machine: m.name,
+                    status: "Finished ✅",
+                    message: "Your laundry cycle has been marked as finished. Please collect your items immediately."
+                };
+                
+                // Use the SAME Service ID and Template ID that worked for the Start email
+                await emailjs.send('service_71yqlq4', 'template_c3n187k', templateParams);
+                console.log("Finish email sent!");
+            }
+        }
+
+        // 3. Clear the machine data (Make Available)
+        await updateDoc(machineRef, { 
+            status: 'available', 
+            userId: null, 
+            userEmail: null, 
+            startTime: null 
+        });
+
+        alert("✅ Laundry finished! Notification email sent.");
+
+    } catch (error) { 
+        console.error("Finish Error:", error); 
+        alert("Error: " + error.message); 
+    }
+}
 window.reportMachine = async function(machineId) {
     if (!confirm("Report issue?")) return;
     try {
@@ -654,3 +708,96 @@ window.fixMachine = async function(machineId) {
 window.deleteMachine = async (id) => {
     if(confirm("Delete machine?")) await deleteDoc(doc(db, "machines", id));
 };
+
+// ==========================================
+// 📧 EMAIL NOTIFICATION HELPER
+// ==========================================
+// ==========================================
+// 📧 EMAIL NOTIFICATION HELPER (Updated)
+// ==========================================
+// ==========================================
+// 📧 EMAIL NOTIFICATION HELPER (Fixed)
+// ==========================================
+async function sendEmailNotification(userEmail, machineName, type) {
+    if(!userEmail) return;
+
+    let subjectStatus = "";
+    let messageBody = "";
+
+    if (type === "start") {
+        // Calculate finish time (currently set to 2 mins for testing)
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + 2); 
+        const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        subjectStatus = "Started ⏳";
+        messageBody = `Your laundry cycle has started! It will finish at approximately ${timeString}.`;
+    } 
+    else if (type === "finish") {
+        subjectStatus = "Finished ✅";
+        messageBody = `Your laundry timer is up! The machine has been marked as available. Please collect your items immediately.`;
+    }
+
+    const templateParams = {
+        to_email: userEmail,
+        name: "Student",
+        machine: machineName,
+        status: subjectStatus,
+        message: messageBody
+    };
+
+    try {
+        // ✅ I updated these with the IDs found in your finishMachine function
+        await emailjs.send('service_71yqlq4', 'template_c3n187k', templateParams);
+        console.log(`📧 ${type} email sent to ${userEmail}`);
+    } catch(error) {
+        console.error("Failed to send email:", error);
+    }
+}
+// ==========================================
+// ⏱️ AUTOMATIC FINISH SYSTEM ("Heartbeat")
+// ==========================================
+// This runs every 60 seconds to check for finished machines
+setInterval(checkExpiredMachines, 60000); // 60000 ms = 1 minute
+
+async function checkExpiredMachines() {
+    console.log("💜 Heartbeat: Checking for finished machines...");
+    
+    try {
+        // 1. Get all machines that are currently "in_use"
+        const q = query(collection(db, "machines"), where("status", "==", "in_use"));
+        const snapshot = await getDocs(q);
+
+        const now = new Date();
+
+        snapshot.forEach(async (docSnap) => {
+            const m = docSnap.data();
+            
+            if (m.startTime) {
+                const startTime = new Date(m.startTime);
+                // Calculate difference in minutes
+                const diffMinutes = (now - startTime) / 1000 / 60;
+
+                // ⚠️ CHANGE '2' TO '32' FOR REAL APP
+                if (diffMinutes >= 2) {
+                    console.log(`Machine ${m.name} finished! Auto-completing...`);
+
+                    // 2. Send "Finished" Email
+                    if (m.userEmail) {
+                        sendEmailNotification(m.userEmail, m.name, "finish");
+                    }
+
+                    // 3. Reset Machine to Available
+                    await updateDoc(docSnap.ref, {
+                        status: 'available',
+                        userId: null,
+                        userEmail: null,
+                        startTime: null
+                    });
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Auto-Check Error:", error);
+    }
+}
