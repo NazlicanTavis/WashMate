@@ -22,6 +22,20 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// 🆕 GLOBAL VARIABLE to store today's bookings
+let todaysBookings = [];
+
+// 🆕 LISTENER: Keep 'todaysBookings' updated in real-time
+const todayStr = new Date().toISOString().split('T')[0];
+onSnapshot(query(collection(db, "appointments"), where("date", "==", todayStr)), (snapshot) => {
+    todaysBookings = [];
+    snapshot.forEach(doc => {
+        todaysBookings.push({ id: doc.id, ...doc.data() });
+    });
+    // Triggers the UI to refresh whenever a booking is made or deleted
+    if(window.currentMachinesSnapshot) renderMachinesGrid(window.currentMachinesSnapshot);
+});
+
 // 🆕 CONSTANT: Time Slots (Updated to 1-Hour Intervals)
 const TIME_SLOTS = [
     "08:00 - 09:00",
@@ -478,86 +492,118 @@ window.deleteReservation = async (id) => {
 
 
 // --- Load Machines (Updated for Time Slots) ---
+// ==========================================
+// 🔄 UPDATED: LOAD MACHINES (Smart Logic)
+// ==========================================
+// ==========================================
+// 🔄 UPDATED: LOAD MACHINES (With Reservation Logic)
+// ==========================================
+window.currentMachinesSnapshot = null; // Store snapshot globally
+
 function loadMachines(isAdmin) {
     onSnapshot(collection(db, "machines"), (snapshot) => {
-        const grid = document.getElementById('machinesGrid');
-        grid.innerHTML = "";
+        window.currentMachinesSnapshot = snapshot;
+        renderMachinesGrid(snapshot, isAdmin);
+    });
+}
+
+// 🆕 RENDER FUNCTION (Draws the card based on logic)
+function renderMachinesGrid(snapshot, isAdmin = false) {
+    const grid = document.getElementById('machinesGrid');
+    if(!grid) return;
+    grid.innerHTML = "";
+    
+    const user = auth.currentUser;
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    snapshot.forEach(d => {
+        const m = d.data();
+        const machineId = d.id;
         
-        snapshot.forEach(d => {
-            const m = d.data();
-            
-            // Simplified status logic for Time Slot version
-            // "In Use" is set manually by students when they arrive
-            let statusClass = 'st-free';
-            let statusText = 'AVAILABLE';
-            
-            if (m.status === 'in_use') {
-                statusClass = 'st-busy'; 
-                statusText = 'IN USE';
-            } 
-            else if (m.status === 'disabled') {
-                statusClass = 'st-busy'; 
-                statusText = '⚠️ MAINTENANCE';
-            }
-
-            const usageStats = m.usageCount || 0; 
-
-            let actionBtn = "";
-            let statsHTML = "";
-
-            if (isAdmin) {
-                const deleteBtn = `<button onclick="window.deleteMachine('${d.id}')" style="color:red; float:right; border:none; background:none; cursor:pointer;" title="Delete"><i class="fa-solid fa-trash"></i></button>`;
-                
-                if (m.status === 'disabled') {
-                    actionBtn = `<button onclick="window.fixMachine('${d.id}')" class="btn-main" style="margin-top:10px; background-color:#f59e0b; color:black;">Repair / Enable</button>`;
-                } else {
-                    actionBtn = `<div style="height:35px;"></div>`; 
-                }
-                statsHTML = `${deleteBtn}<div style="font-size:0.8rem; color:#64748b; margin-top:5px; border-top:1px solid #eee; padding-top:5px;">Total Cycles: <b>${usageStats}</b></div>`;
-            } 
-            else {
-                // STUDENT VIEW
-                if (m.status === 'disabled') {
-                    actionBtn = `<div style="margin-top:10px; font-size:0.8rem; color:#ef4444; font-weight:bold;">OUT OF ORDER</div>`;
-                } 
-                else if (m.status === 'in_use') {
-                    // If in use, only show "Finish" if the user started it? 
-                    // Or keep it simple: Anyone can finish if they see it's done? 
-                    // Let's assume generic "Finish" for now or just show status.
-                    actionBtn = `<button onclick="window.finishMachine('${d.id}')" class="btn-main" style="margin-top:10px; background-color:#16a34a;">Finish / Free Up</button>`;
-                }
-                else {
-                    // AVAILABLE -> Show "Book Slot" OR "Start Now"
-                    actionBtn = `
-                    <div style="display:flex; flex-direction:column; gap:5px; margin-top:10px;">
-                        <button onclick="window.openBookingModal('${d.id}', '${m.name}')" class="btn-main" style="background-color:#2563eb;">📅 Book Future Slot</button>
-                        <div style="display:flex; gap:5px;">
-                            <button onclick="window.startMachine('${d.id}')" class="btn-main" style="flex:1; background-color:#f59e0b; color:black;">▶ Start Now</button>
-                            <button onclick="window.reportMachine('${d.id}')" class="btn-main" style="flex:0.5; background-color:#64748b;" title="Report"><i class="fa-solid fa-triangle-exclamation"></i></button>
-                        </div>
-                    </div>`;
-                }
-            }
-
-            let cardStyle = "";
-            if(m.status === 'disabled') cardStyle = "opacity:0.8; background:#fef2f2;";
-
-            grid.innerHTML += `
-            <div class="machine-card" style="${cardStyle}">
-                <div style="font-size:2rem; color:${m.status==='disabled'?'#ef4444':(m.status==='in_use'?'#dc2626':'#2563eb')}; margin-bottom:10px;">
-                    <i class="fa-solid ${m.status==='disabled'?'fa-triangle-exclamation':'fa-soap'}"></i>
-                </div>
-                <h3>${m.name}</h3>
-                <div style="font-size:0.9rem; color:#475569; font-weight:600; margin-bottom:5px;">
-                    ${m.brand || 'Generic'} • ${m.capacity || '-'}kg
-                </div>
-                <p style="color:#64748b;">${m.type}</p>
-                ${isAdmin ? statsHTML : ''}
-                <div class="status-badge ${statusClass}">${statusText}</div>
-                ${!isAdmin ? actionBtn : ''}
-                ${isAdmin && m.status === 'disabled' ? actionBtn : ''}
-            </div>`;
+        // 1. Check for Active Reservation (Current Hour)
+        // We look for a booking that matches THIS machine and THIS hour
+        const activeRes = todaysBookings.find(b => {
+            const startHour = parseInt(b.slot.split(':')[0]);
+            return b.machineId === machineId && startHour === currentHour;
         });
+
+        // 2. Determine Status
+        let statusClass = 'st-free';
+        let statusText = 'AVAILABLE';
+        let isReserved = false;
+
+        if (m.status === 'disabled') {
+            statusClass = 'st-busy'; statusText = '⚠️ MAINTENANCE';
+        } 
+        else if (m.status === 'in_use') {
+            statusClass = 'st-busy'; statusText = 'IN USE';
+        } 
+        else if (activeRes) {
+            // 🛑 Machine is technically "available" in DB, but RESERVED by a slot
+            isReserved = true;
+            statusClass = 'st-busy'; 
+            statusText = '⏳ RESERVED';
+        }
+
+        // 3. Build Buttons
+        let actionBtn = "";
+        const btnBook = `<button onclick="window.openBookingModal('${machineId}', '${m.name}')" class="btn-main" style="background-color:#2563eb; width:100%; margin-bottom:5px;">📅 Book Future Slot</button>`;
+
+        if (isAdmin) {
+            /* Admin controls (Simplified for brevity - keep your existing admin logic here if needed) */
+            if(m.status === 'in_use') actionBtn = `<button onclick="window.finishMachine('${machineId}')" class="btn-main" style="background-color:#ef4444;">Force Finish</button>`;
+            else if(m.status === 'disabled') actionBtn = `<button onclick="window.fixMachine('${machineId}')" class="btn-main" style="background-color:#f59e0b; color:black;">Repair</button>`;
+        } 
+        else {
+            // STUDENT CONTROLS
+            if (m.status === 'disabled') {
+                actionBtn = `<div style="color:#ef4444; font-weight:bold; margin-top:10px;">OUT OF ORDER</div>`;
+            }
+            else if (m.status === 'in_use') {
+                // If it's MY machine running
+                if (user && m.userId === user.uid) {
+                    actionBtn = `${btnBook}<button onclick="window.finishMachine('${machineId}')" class="btn-main" style="background-color:#16a34a;">✅ Finish My Wash</button>`;
+                } else {
+                    actionBtn = `${btnBook}<div class="status-box">🚫 In Use (Not yours)</div>`;
+                }
+            }
+            else if (isReserved) {
+                // 🛑 IT IS RESERVED LOGIC 🛑
+                // Check if it is reserved for ME
+                if (user && activeRes.userId === user.uid) {
+                    actionBtn = `
+                        <div style="background:#dcfce7; color:#166534; padding:5px; font-size:0.8rem; border-radius:5px; margin-bottom:5px;">✅ Reserved for you!</div>
+                        <button onclick="window.startMachine('${machineId}')" class="btn-main" style="background-color:#f59e0b; color:black;">▶ Start Reservation</button>
+                    `;
+                } else {
+                    actionBtn = `${btnBook}<div class="status-box">🔒 Reserved for ${activeRes.slot}</div>`;
+                }
+            }
+            else {
+                // Completely Free
+                actionBtn = `
+                <div style="display:flex; flex-direction:column; gap:5px; margin-top:10px;">
+                    ${btnBook}
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="window.startMachine('${machineId}')" class="btn-main" style="flex:1; background-color:#f59e0b; color:black;">▶ Start Now</button>
+                        <button onclick="window.reportMachine('${machineId}')" class="btn-main" style="flex:0.5; background-color:#64748b;" title="Report"><i class="fa-solid fa-triangle-exclamation"></i></button>
+                    </div>
+                </div>`;
+            }
+        }
+
+        // Render Card
+        grid.innerHTML += `
+        <div class="machine-card" style="${m.status==='disabled'?'opacity:0.8; background:#fef2f2;':''}">
+            <div style="font-size:2rem; color:${statusText==='AVAILABLE'?'#2563eb':'#dc2626'}; margin-bottom:10px;">
+                <i class="fa-solid fa-soap"></i>
+            </div>
+            <h3>${m.name}</h3>
+            <div style="font-size:0.9rem; color:#64748b;">${m.type}</div>
+            <div class="status-badge ${statusClass}">${statusText}</div>
+            ${actionBtn}
+        </div>`;
     });
 }
 
@@ -613,60 +659,129 @@ if(btnCancelAdd) {
 }
 
 // ==========================================
-// ADMIN ADVANCED FEATURES
+// 🛠️ ADMIN ADVANCED FEATURES (Upgraded)
 // ==========================================
 
+// 1. INITIALIZE: Populates DB with default machines if empty
 window.initializeDatabase = async function() {
-    const confirmInit = confirm("WARNING: This will automatically add 10 test machines. Proceed?");
-    if (!confirmInit) return;
+    if (!confirm("⚠️ Initialize System?\n\nThis will add default machines to the database.")) return;
+    
     try {
-        const batch = writeBatch(db); 
+        const batch = writeBatch(db);
+        
+        // Create 5 Washers
         for (let i = 1; i <= 5; i++) {
-            batch.set(doc(collection(db, "machines")), {
-                type: "Washer", name: `Washer #${i}`, brand: "Samsung", capacity: "9", status: "available"
-            });
-            batch.set(doc(collection(db, "machines")), {
-                type: "Dryer", name: `Dryer #${i}`, brand: "LG", capacity: "8", status: "available"
+            const newRef = doc(collection(db, "machines"));
+            batch.set(newRef, { 
+                name: `Washer #${i}`, 
+                brand: "Samsung", 
+                type: "Washer", 
+                capacity: "9", 
+                status: "available", 
+                usageCount: 0 
             });
         }
+
+        // Create 5 Dryers
+        for (let i = 1; i <= 5; i++) {
+            const newRef = doc(collection(db, "machines"));
+            batch.set(newRef, { 
+                name: `Dryer #${i}`, 
+                brand: "LG", 
+                type: "Dryer", 
+                capacity: "10", 
+                status: "available", 
+                usageCount: 0 
+            });
+        }
+
         await batch.commit(); 
-        alert("✅ Success! 10 machines added.");
-    } catch (error) { console.error("Init Error:", error); alert("Error: " + error.message); }
+        alert("✅ Database Initialized with 10 Machines.");
+        
+    } catch (error) { 
+        console.error("Init Error:", error); 
+        alert("Error: " + error.message); 
+    }
 }
 
+// 2. RESET: Deletes ALL Machines and Appointments (Wipes DB)
 window.resetSystem = async function() {
-    const confirmReset = confirm("WARNING: Reset all machines to 'Available'?");
+    const confirmReset = confirm("🔴 WARNING: HARD RESET \n\nThis will DELETE ALL Machines and Appointments from the database.\n\nAre you sure?");
     if (!confirmReset) return;
+
     try {
-        const querySnapshot = await getDocs(collection(db, "machines"));
-        const batch = writeBatch(db);
-        querySnapshot.forEach((doc) => {
-            batch.update(doc.ref, { status: "available", startTime: null, userId: null });
-        });
-        await batch.commit();
-        alert("✅ System Reset!");
-    } catch (error) { console.error("Reset Error:", error); alert("Reset failed: " + error.message); }
+        console.log("Starting System Reset...");
+
+        // A. Delete All Appointments
+        const appQuery = await getDocs(collection(db, "appointments"));
+        const batch1 = writeBatch(db);
+        appQuery.forEach((doc) => batch1.delete(doc.ref));
+        await batch1.commit();
+        console.log("Appointments deleted.");
+
+        // B. Delete All Machines
+        const machQuery = await getDocs(collection(db, "machines"));
+        const batch2 = writeBatch(db);
+        machQuery.forEach((doc) => batch2.delete(doc.ref));
+        await batch2.commit();
+        console.log("Machines deleted.");
+
+        alert("✅ System Reset Complete.\nDatabase is now empty.");
+        
+    } catch (error) { 
+        console.error("Reset Error:", error); 
+        alert("Reset failed: " + error.message); 
+    }
 }
 
+// 3. BACKUP: Downloads Users, Machines, and Appointments as JSON
 window.backupData = async function() {
     try {
-        const querySnapshot = await getDocs(collection(db, "machines"));
-        let data = [];
-        querySnapshot.forEach((doc) => { data.push({ id: doc.id, ...doc.data() }); });
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        console.log("Generating Backup...");
+        const backupData = {
+            timestamp: new Date().toISOString(),
+            machines: [],
+            users: [],
+            appointments: []
+        };
+
+        // Get Machines
+        const mSnap = await getDocs(collection(db, "machines"));
+        mSnap.forEach(doc => backupData.machines.push({ id: doc.id, ...doc.data() }));
+
+        // Get Users
+        const uSnap = await getDocs(collection(db, "users"));
+        uSnap.forEach(doc => backupData.users.push({ id: doc.id, ...doc.data() }));
+
+        // Get Appointments
+        const aSnap = await getDocs(collection(db, "appointments"));
+        aSnap.forEach(doc => backupData.appointments.push({ id: doc.id, ...doc.data() }));
+
+        // Create and Download JSON File
+        const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "washmate_backup.json";
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        alert("✅ Backup downloaded!");
-    } catch (error) { console.error("Backup Error:", error); alert("Backup failed: " + error.message); }
+        a.download = `washmate_full_backup_${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a); 
+        a.click(); 
+        document.body.removeChild(a);
+
+        alert(`✅ Backup Successful!\nSaved ${backupData.machines.length} machines, ${backupData.users.length} users, ${backupData.appointments.length} appointments.`);
+
+    } catch (error) { 
+        console.error("Backup Error:", error); 
+        alert("Backup failed: " + error.message); 
+    }
 }
 
+// Button Event Listeners (Ensure these match your HTML IDs)
 const btnInit = document.getElementById('btnInitialize');
 if(btnInit) btnInit.addEventListener('click', window.initializeDatabase);
+
 const btnReset = document.getElementById('btnReset');
 if(btnReset) btnReset.addEventListener('click', window.resetSystem);
+
 const btnBackup = document.getElementById('btnBackup');
 if(btnBackup) btnBackup.addEventListener('click', window.backupData);
 // Removed Check No Shows button listener since we removed the logic
@@ -868,64 +983,53 @@ async function checkExpiredMachines() {
 }
 
 
-// 🆕 5-MINUTE NO-SHOW RULE
+// 🆕 5-MINUTE NO-SHOW RULE (Auto-Delete)
 async function checkNoShows() {
     console.log("🕵️ Checking for No-Shows...");
     
-    try {
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0]; // Today's date (YYYY-MM-DD)
+    // We can just use the global variable 'todaysBookings' we created in Step 1!
+    // No need to query the database again. Efficient!
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    todaysBookings.forEach(async (booking) => {
+        // 1. Get Booking Hour (e.g., "10" from "10:00 - 11:00")
+        const slotStartHour = parseInt(booking.slot.split(':')[0]);
+
+        // 2. Check if the booking started in the PREVIOUS hour or CURRENT hour?
+        // Actually, we just check if we are 5 minutes past the start time.
         
-        // 1. Get ALL appointments for TODAY
-        const q = query(collection(db, "appointments"), where("date", "==", dateStr));
-        const snapshot = await getDocs(q);
+        let minutesLate = 0;
         
-        if (snapshot.empty) return;
+        if (currentHour === slotStartHour) {
+            minutesLate = currentMinute; 
+        } else if (currentHour > slotStartHour) {
+            minutesLate = 60 + currentMinute; // Very late
+        }
 
-        snapshot.forEach(async (appSnap) => {
-            const booking = appSnap.data();
+        // 3. RULE: If 5 minutes passed (minutesLate > 5) AND machine is NOT 'in_use'
+        if (minutesLate > 5 && minutesLate < 60) {
             
-            // 2. Parse the Slot Start Time (e.g., "10:00 - 12:00")
-            const slotStartString = booking.slot.split(' - ')[0]; // Gets "10:00"
-            const [hours, minutes] = slotStartString.split(':');
+            // Check the actual machine status in DB to be safe
+            const mRef = doc(db, "machines", booking.machineId);
+            const mSnap = await getDoc(mRef);
             
-            // Create a Date object for the Booking Start Time
-            const bookingTime = new Date();
-            bookingTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-            
-            // Calculate how many minutes late they are
-            const diffMinutes = (now - bookingTime) / 60000; // milliseconds to minutes
-
-            // ⚠️ RULE: If they are more than 5 mins late (and less than 120 mins)
-            if (diffMinutes > 5 && diffMinutes < 120) {
+            if (mSnap.exists() && mSnap.data().status === 'available') {
+                console.log(`⚠️ User ${booking.userEmail} is late! Deleting reservation...`);
                 
-                // 3. Check if Machine is STILL Available (Not Started)
-                const mRef = doc(db, "machines", booking.machineId);
-                const mSnap = await getDoc(mRef);
+                // A. Delete the appointment
+                await deleteDoc(doc(db, "appointments", booking.id));
                 
-                if (mSnap.exists() && mSnap.data().status === 'available') {
-                    console.log(`⚠️ No-Show detected for ${booking.userEmail}. Deleting reservation.`);
-                    
-                    // A. Delete the Appointment
-                    await deleteDoc(appSnap.ref);
-                    
-                    // B. Penalize the User (Increase No-Show Count)
-                    const uRef = doc(db, "users", booking.userId);
-                    const uSnap = await getDoc(uRef);
-                    
-                    if(uSnap.exists()) {
-                        const currentCount = uSnap.data().noShowCount || 0;
-                        await updateDoc(uRef, { noShowCount: currentCount + 1 });
-                    }
-
-                    // C. Optional: Send "Cancelled" Email
-                    // You can use your sendEmailNotification helper here if you want!
+                // B. Penalize User (Optional)
+                const uRef = doc(db, "users", booking.userId);
+                const uSnap = await getDoc(uRef);
+                if(uSnap.exists()) {
+                    await updateDoc(uRef, { noShowCount: (uSnap.data().noShowCount || 0) + 1 });
                 }
             }
-        });
-
-    } catch (error) {
-        console.error("No-Show Check Error:", error);
-    }
+        }
+    });
 }
 
