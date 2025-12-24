@@ -26,7 +26,14 @@ const db = getFirestore(app);
 let todaysBookings = [];
 
 // 🆕 LISTENER: Keep 'todaysBookings' updated in real-time
-const todayStr = new Date().toISOString().split('T')[0];
+const getLocalISODate = () => {
+    const d = new Date();
+    // Adjust for timezone offset to get local YYYY-MM-DD
+    const offset = d.getTimezoneOffset() * 60000; 
+    return new Date(d.getTime() - offset).toISOString().split('T')[0];
+};
+
+const todayStr = getLocalISODate();
 onSnapshot(query(collection(db, "appointments"), where("date", "==", todayStr)), (snapshot) => {
     todaysBookings = [];
     snapshot.forEach(doc => {
@@ -599,9 +606,15 @@ function renderMachinesGrid(snapshot, isAdmin = false) {
             <div style="font-size:2rem; color:${statusText==='AVAILABLE'?'#2563eb':'#dc2626'}; margin-bottom:10px;">
                 <i class="fa-solid fa-soap"></i>
             </div>
-            <h3>${m.name}</h3>
-            <div style="font-size:0.9rem; color:#64748b;">${m.type}</div>
-            <div class="status-badge ${statusClass}">${statusText}</div>
+            
+            <h3 style="margin: 0 0 5px 0;">${m.name}</h3>
+            
+            <div style="font-size:0.85rem; color:#64748b; margin-bottom:10px;">
+                ${m.brand || 'Generic'} • ${m.capacity || '?'}kg • ${m.type}
+            </div>
+
+            <div class="status-badge ${statusClass}" style="margin-bottom:15px;">${statusText}</div>
+            
             ${actionBtn}
         </div>`;
     });
