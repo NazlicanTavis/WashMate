@@ -612,6 +612,9 @@ function renderMachinesGrid(snapshot, isAdmin = false) {
             <div style="font-size:0.85rem; color:#64748b; margin-bottom:10px;">
                 ${m.brand || 'Generic'} • ${m.capacity || '?'}kg • ${m.type}
             </div>
+            
+            <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:10px; font-weight:500;">
+                🔄 Total Cycles: ${m.usageCount || 0}
 
             <div class="status-badge ${statusClass}" style="margin-bottom:15px;">${statusText}</div>
             
