@@ -22,10 +22,10 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// 🆕 GLOBAL VARIABLE to store today's bookings
+//  GLOBAL VARIABLE to store today's bookings
 let todaysBookings = [];
 
-// 🆕 LISTENER: Keep 'todaysBookings' updated in real-time
+//  LISTENER: Keep 'todaysBookings' updated in real-time
 const getLocalISODate = () => {
     const d = new Date();
     // Adjust for timezone offset to get local YYYY-MM-DD
@@ -43,7 +43,7 @@ onSnapshot(query(collection(db, "appointments"), where("date", "==", todayStr)),
     if(window.currentMachinesSnapshot) renderMachinesGrid(window.currentMachinesSnapshot);
 });
 
-// 🆕 CONSTANT: Time Slots (Updated to 1-Hour Intervals)
+// CONSTANT: Time Slots (Updated to 1-Hour Intervals)
 const TIME_SLOTS = [
     "08:00 - 09:00",
     "09:00 - 10:00",
@@ -64,9 +64,9 @@ const TIME_SLOTS = [
 ];
 
 console.log("WashMate loaded succesfully!"); 
-// ==========================================
-// 🔄 AUTH LISTENER (Keeps you logged in!)
-// ==========================================
+
+//  AUTH LISTENER (Keeps you logged in)
+
 onAuthStateChanged(auth, (user) => {
     if (user) {
         console.log("User detected:", user.email);
@@ -99,9 +99,9 @@ window.switchTab = function(tabName) {
     }
 };
 
-// ==========================================
+
 // STUDENT REGISTRATION (PENDING STATUS)
-// ==========================================
+
 const btnStudentReg = document.getElementById('btnStudentReg');
 if(btnStudentReg) {
     btnStudentReg.addEventListener('click', async () => {
@@ -218,11 +218,11 @@ function setupStudentView(user) {
     document.getElementById('adminApprovalsSection').style.display = 'none';
     document.getElementById('addMachineBtn').style.display = 'none';
 
-    // 🆕 Show Reservations for Student
+    // Show Reservations for Student
     const myResSection = document.getElementById('myReservationsSection');
     if(myResSection) myResSection.style.display = 'block';
     
-    // 🆕 Load Data
+    // Load Data
     loadMyReservations();
     loadMachines(false);
 }
@@ -246,9 +246,8 @@ function setupAdminView(user) {
     loadPendingUsers(); 
 }
 
-// ==========================================
+
 // ADMIN APPROVAL SYSTEM LOGIC
-// ==========================================
 
 function loadPendingUsers() {
     const q = query(collection(db, "users"), where("status", "==", "pending"));
@@ -285,9 +284,9 @@ function loadPendingUsers() {
     });
 }
 
-// ==========================================
-// ⚠️ UPDATED: APPROVE USER WITH EMAIL
-// ==========================================
+
+// APPROVE USER WITH EMAIL
+
 window.approveUser = async (uid) => {
     if(!confirm("Approve this student and send email?")) return;
     
@@ -333,9 +332,8 @@ window.rejectUser = async (uid) => {
 };
 
 
-// ==========================================
-// 🆕 TIME SLOT BOOKING LOGIC
-// ==========================================
+
+ //  TIME SLOT BOOKING LOGIC
 
 // 1. Open Booking Modal
 window.openBookingModal = async function(machineId, machineName) {
@@ -500,10 +498,10 @@ window.deleteReservation = async (id) => {
 
 // --- Load Machines (Updated for Time Slots) ---
 // ==========================================
-// 🔄 UPDATED: LOAD MACHINES (Smart Logic)
+//     LOAD MACHINES (Smart Logic)
 // ==========================================
 // ==========================================
-// 🔄 UPDATED: LOAD MACHINES (With Reservation Logic)
+//     LOAD MACHINES (With Reservation Logic)
 // ==========================================
 window.currentMachinesSnapshot = null; // Store snapshot globally
 
@@ -514,7 +512,7 @@ function loadMachines(isAdmin) {
     });
 }
 
-// 🆕 RENDER FUNCTION (Draws the card based on logic)
+// RENDER FUNCTION (Draws the card based on logic)
 function renderMachinesGrid(snapshot, isAdmin = false) {
     const grid = document.getElementById('machinesGrid');
     if(!grid) return;
@@ -625,9 +623,9 @@ function renderMachinesGrid(snapshot, isAdmin = false) {
 
 window.logout = () => signOut(auth).then(() => location.reload());
 
-// =======================================================
+
 // ADD MACHINE MODAL
-// =======================================================
+
 window.addMachine = function() {
     const modal = document.getElementById('addMachineModal');
     if(modal) modal.style.display = 'flex';
@@ -674,9 +672,8 @@ if(btnCancelAdd) {
     });
 }
 
-// ==========================================
-// 🛠️ ADMIN ADVANCED FEATURES (Upgraded)
-// ==========================================
+
+// 🛠 ADMIN ADVANCED FEATURES 
 
 // 1. INITIALIZE: Populates DB with default machines if empty
 window.initializeDatabase = async function() {
@@ -900,14 +897,9 @@ window.deleteMachine = async (id) => {
 };
 
 // ==========================================
-// 📧 EMAIL NOTIFICATION HELPER
+//  EMAIL NOTIFICATION HELPER
 // ==========================================
-// ==========================================
-// 📧 EMAIL NOTIFICATION HELPER (Updated)
-// ==========================================
-// ==========================================
-// 📧 EMAIL NOTIFICATION HELPER (Fixed)
-// ==========================================
+
 async function sendEmailNotification(userEmail, machineName, type) {
     if(!userEmail) return;
 
@@ -946,13 +938,12 @@ async function sendEmailNotification(userEmail, machineName, type) {
 }
 
 
-// ==========================================
-// ⏱️ AUTOMATIC BACKGROUND CHECKS ("Heartbeat")
-// ==========================================
+//  AUTOMATIC BACKGROUND CHECKS 
+
 // Runs every 60 seconds
 setInterval(() => {
     checkExpiredMachines(); // Existing: Checks for finish time
-    checkNoShows();         // 🆕 NEW: Checks for late students
+    checkNoShows();         //  Checks for late students
 }, 60000);
 
 
@@ -974,7 +965,7 @@ async function checkExpiredMachines() {
                 // Calculate difference in minutes
                 const diffMinutes = (now - startTime) / 1000 / 60;
 
-                // ⚠️ CHANGE '2' TO '32' FOR REAL APP
+                //  CHANGE '2' TO '32' FOR REAL APP
                 if (diffMinutes >= 2) {
                     console.log(`Machine ${m.name} finished! Auto-completing...`);
 
@@ -999,7 +990,7 @@ async function checkExpiredMachines() {
 }
 
 
-// 🆕 5-MINUTE NO-SHOW RULE (Auto-Delete)
+//  5-MINUTE NO-SHOW RULE (Auto-Delete)
 async function checkNoShows() {
     console.log("🕵️ Checking for No-Shows...");
     
