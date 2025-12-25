@@ -65,7 +65,7 @@ const TIME_SLOTS = [
 
 console.log("WashMate loaded succesfully!"); 
 
-//  AUTH LISTENER (Keeps you logged in)
+//  AUTH LISTENER (Keeps logged in)
 
 onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -165,9 +165,8 @@ if(btnLogin) {
     });
 }
 
-// ==========================================
 // LOGIN CHECK (BLOCK PENDING USERS)
-// ==========================================
+
 async function checkUserRole(uid) {
     const docSnap = await getDoc(doc(db, "users", uid));
     
@@ -498,9 +497,6 @@ window.deleteReservation = async (id) => {
 
 // --- Load Machines (Updated for Time Slots) ---
 // ==========================================
-//     LOAD MACHINES (Smart Logic)
-// ==========================================
-// ==========================================
 //     LOAD MACHINES (With Reservation Logic)
 // ==========================================
 window.currentMachinesSnapshot = null; // Store snapshot globally
@@ -545,7 +541,7 @@ function renderMachinesGrid(snapshot, isAdmin = false) {
             statusClass = 'st-busy'; statusText = 'IN USE';
         } 
         else if (activeRes) {
-            // 🛑 Machine is technically "available" in DB, but RESERVED by a slot
+            //  Machine is technically "available" in DB, but RESERVED by a slot
             isReserved = true;
             statusClass = 'st-busy'; 
             statusText = '⏳ RESERVED';
@@ -574,7 +570,7 @@ function renderMachinesGrid(snapshot, isAdmin = false) {
                 }
             }
             else if (isReserved) {
-                // 🛑 IT IS RESERVED LOGIC 🛑
+                //  IT IS RESERVED LOGIC 
                 // Check if it is reserved for ME
                 if (user && activeRes.userId === user.uid) {
                     actionBtn = `
@@ -673,7 +669,7 @@ if(btnCancelAdd) {
 }
 
 
-// 🛠 ADMIN ADVANCED FEATURES 
+//  ADMIN ADVANCED FEATURES 
 
 // 1. INITIALIZE: Populates DB with default machines if empty
 window.initializeDatabase = async function() {
@@ -801,8 +797,6 @@ if(btnBackup) btnBackup.addEventListener('click', window.backupData);
 
 // ==========================================
 // START / FINISH / REPORT LOGIC (UPDATED)
-// ==========================================
-
 // NOTE: bookMachine is removed. We use openBookingModal instead.
 
 window.startMachine = async function(machineId) {
@@ -819,7 +813,7 @@ window.startMachine = async function(machineId) {
             usageCount: (m.usageCount || 0) + 1,
             userId: user.uid,
             userEmail: user.email,
-            // ⚠️ NEW: We save the Start Time so the auto-checker knows when to finish it
+            // NEW: We save the Start Time so the auto-checker knows when to finish it
             startTime: new Date().toISOString() 
         });
 
@@ -896,10 +890,8 @@ window.deleteMachine = async (id) => {
     if(confirm("Delete machine?")) await deleteDoc(doc(db, "machines", id));
 };
 
-// ==========================================
-//  EMAIL NOTIFICATION HELPER
-// ==========================================
 
+//  EMAIL NOTIFICATION HELPER
 async function sendEmailNotification(userEmail, machineName, type) {
     if(!userEmail) return;
 
@@ -929,7 +921,7 @@ async function sendEmailNotification(userEmail, machineName, type) {
     };
 
     try {
-        // ✅ I updated these with the IDs found in your finishMachine function
+        // I updated these with the IDs found in your finishMachine function
         await emailjs.send('service_71yqlq4', 'template_c3n187k', templateParams);
         console.log(`📧 ${type} email sent to ${userEmail}`);
     } catch(error) {
@@ -1029,7 +1021,7 @@ async function checkNoShows() {
                 // A. Delete the appointment
                 await deleteDoc(doc(db, "appointments", booking.id));
                 
-                // B. Penalize User (Optional)
+                // B. Penalize User
                 const uRef = doc(db, "users", booking.userId);
                 const uSnap = await getDoc(uRef);
                 if(uSnap.exists()) {
