@@ -517,10 +517,18 @@ function renderMachinesGrid(snapshot, isAdmin = false) {
     const user = auth.currentUser;
     const now = new Date();
     const currentHour = now.getHours();
+    
 
     snapshot.forEach(d => {
         const m = d.data();
         const machineId = d.id;
+        const cyclesHtml = isAdmin
+            ? `
+    <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:10px; font-weight:500;">
+      🔄 Total Cycles: ${m.usageCount || 0}
+    </div>
+  `
+            : '';
         
         // 1. Check for Active Reservation (Current Hour)
         // We look for a booking that matches THIS machine and THIS hour
@@ -607,8 +615,7 @@ function renderMachinesGrid(snapshot, isAdmin = false) {
                 ${m.brand || 'Generic'} • ${m.capacity || '?'}kg • ${m.type}
             </div>
             
-            <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:10px; font-weight:500;">
-                🔄 Total Cycles: ${m.usageCount || 0}
+            ${cyclesHtml}
 
             <div class="status-badge ${statusClass}" style="margin-bottom:15px;">${statusText}</div>
             
