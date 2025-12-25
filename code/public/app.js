@@ -1,7 +1,3 @@
-/**
- * WASHMATE APP - V3 (Approval System + Time Slot Booking + Email Notifications)
- */
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, deleteDoc, writeBatch, getDocs, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
@@ -495,10 +491,7 @@ window.deleteReservation = async (id) => {
 }
 
 
-// --- Load Machines (Updated for Time Slots) ---
-// ==========================================
 //     LOAD MACHINES (With Reservation Logic)
-// ==========================================
 window.currentMachinesSnapshot = null; // Store snapshot globally
 
 function loadMachines(isAdmin) {
@@ -802,10 +795,8 @@ const btnBackup = document.getElementById('btnBackup');
 if(btnBackup) btnBackup.addEventListener('click', window.backupData);
 // Removed Check No Shows button listener since we removed the logic
 
-// ==========================================
-// START / FINISH / REPORT LOGIC (UPDATED)
-// NOTE: bookMachine is removed. We use openBookingModal instead.
 
+// START / FINISH / REPORT LOGIC
 window.startMachine = async function(machineId) {
     try {
         const user = auth.currentUser;
@@ -937,8 +928,6 @@ async function sendEmailNotification(userEmail, machineName, type) {
 }
 
 
-//  AUTOMATIC BACKGROUND CHECKS 
-
 // Runs every 60 seconds
 setInterval(() => {
     checkExpiredMachines(); // Existing: Checks for finish time
@@ -1038,4 +1027,3 @@ async function checkNoShows() {
         }
     });
 }
-
